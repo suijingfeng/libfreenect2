@@ -3,7 +3,7 @@ PROJECT(texture)
 
 SET(MY_DIR ${texture_SOURCE_DIR})
 SET(texture_ROOT_DIR ${MY_DIR}/..)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 MESSAGE(STATUS "MY_DIR: " ${MY_DIR})
 MESSAGE(STATUS "texture_ROOT_DIR: " ${texture_ROOT_DIR})

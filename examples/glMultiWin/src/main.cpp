@@ -2,10 +2,7 @@
 #include <cstdio>
 #include <map>
 #include <list>
-
-#include <chrono>
-#include <thread>
-
+#include <unistd.h>
 // Note that the following includes must be defined in order:
 #define GLEW_STATIC
 #define GLEW_MX
@@ -367,8 +364,7 @@ int Init()
 
 int MainLoop()
 {
-	using namespace std::chrono_literals;
-    while (!ShouldClose())
+	while (!ShouldClose())
 	{
 	    /*  
         // Keep Running!
@@ -411,7 +407,7 @@ int MainLoop()
 
 			CheckForGLErrors("Render Error");
 
-            std::this_thread::sleep_for(20ms);
+            usleep(10000);
         }
 
 		glfwPollEvents(); // process events!

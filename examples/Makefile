@@ -502,6 +502,60 @@ src/logging.cpp.s:
 	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/logging.cpp.s
 .PHONY : src/logging.cpp.s
 
+src/opencl_depth_packet_processor.o: src/opencl_depth_packet_processor.cpp.o
+
+.PHONY : src/opencl_depth_packet_processor.o
+
+# target to build an object file
+src/opencl_depth_packet_processor.cpp.o:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_depth_packet_processor.cpp.o
+.PHONY : src/opencl_depth_packet_processor.cpp.o
+
+src/opencl_depth_packet_processor.i: src/opencl_depth_packet_processor.cpp.i
+
+.PHONY : src/opencl_depth_packet_processor.i
+
+# target to preprocess a source file
+src/opencl_depth_packet_processor.cpp.i:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_depth_packet_processor.cpp.i
+.PHONY : src/opencl_depth_packet_processor.cpp.i
+
+src/opencl_depth_packet_processor.s: src/opencl_depth_packet_processor.cpp.s
+
+.PHONY : src/opencl_depth_packet_processor.s
+
+# target to generate assembly for a file
+src/opencl_depth_packet_processor.cpp.s:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_depth_packet_processor.cpp.s
+.PHONY : src/opencl_depth_packet_processor.cpp.s
+
+src/opencl_kde_depth_packet_processor.o: src/opencl_kde_depth_packet_processor.cpp.o
+
+.PHONY : src/opencl_kde_depth_packet_processor.o
+
+# target to build an object file
+src/opencl_kde_depth_packet_processor.cpp.o:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_kde_depth_packet_processor.cpp.o
+.PHONY : src/opencl_kde_depth_packet_processor.cpp.o
+
+src/opencl_kde_depth_packet_processor.i: src/opencl_kde_depth_packet_processor.cpp.i
+
+.PHONY : src/opencl_kde_depth_packet_processor.i
+
+# target to preprocess a source file
+src/opencl_kde_depth_packet_processor.cpp.i:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_kde_depth_packet_processor.cpp.i
+.PHONY : src/opencl_kde_depth_packet_processor.cpp.i
+
+src/opencl_kde_depth_packet_processor.s: src/opencl_kde_depth_packet_processor.cpp.s
+
+.PHONY : src/opencl_kde_depth_packet_processor.s
+
+# target to generate assembly for a file
+src/opencl_kde_depth_packet_processor.cpp.s:
+	$(MAKE) -f CMakeFiles/freenect2.dir/build.make CMakeFiles/freenect2.dir/src/opencl_kde_depth_packet_processor.cpp.s
+.PHONY : src/opencl_kde_depth_packet_processor.cpp.s
+
 src/opengl_depth_packet_processor.o: src/opengl_depth_packet_processor.cpp.o
 
 .PHONY : src/opengl_depth_packet_processor.o
@@ -1009,6 +1063,12 @@ help:
 	@echo "... src/logging.o"
 	@echo "... src/logging.i"
 	@echo "... src/logging.s"
+	@echo "... src/opencl_depth_packet_processor.o"
+	@echo "... src/opencl_depth_packet_processor.i"
+	@echo "... src/opencl_depth_packet_processor.s"
+	@echo "... src/opencl_kde_depth_packet_processor.o"
+	@echo "... src/opencl_kde_depth_packet_processor.i"
+	@echo "... src/opencl_kde_depth_packet_processor.s"
 	@echo "... src/opengl_depth_packet_processor.o"
 	@echo "... src/opengl_depth_packet_processor.i"
 	@echo "... src/opengl_depth_packet_processor.s"

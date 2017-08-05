@@ -21,6 +21,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/freenect2.dir/src/turbo_jpeg_rgb_packet_processor.cpp.o"
   "CMakeFiles/freenect2.dir/src/flextGL.cpp.o"
   "CMakeFiles/freenect2.dir/src/opengl_depth_packet_processor.cpp.o"
+  "CMakeFiles/freenect2.dir/src/opencl_depth_packet_processor.cpp.o"
+  "CMakeFiles/freenect2.dir/src/opencl_kde_depth_packet_processor.cpp.o"
   "lib/libfreenect2.pdb"
   "lib/libfreenect2.so"
   "lib/libfreenect2.so.0.2.0"

@@ -69,7 +69,7 @@ set(generated_file_path "/home/suijingfeng/catkin_ws/libfreenect2/examples/CMake
 set(generated_file_internal "/home/suijingfeng/catkin_ws/libfreenect2/examples/CMakeFiles/cuda_compile.dir/src/./cuda_compile_generated_cuda_kde_depth_packet_processor.cu.o") # path
 set(generated_cubin_file_internal "/home/suijingfeng/catkin_ws/libfreenect2/examples/CMakeFiles/cuda_compile.dir/src/./cuda_compile_generated_cuda_kde_depth_packet_processor.cu.o.cubin.txt") # path
 
-set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda/bin/nvcc") # path
+set(CUDA_NVCC_EXECUTABLE "/usr/local/cuda-8.0/bin/nvcc") # path
 set(CUDA_NVCC_FLAGS  ;; -use_fast_math -Xcompiler -fPIC) # list
 # Build specific configuration flags
 set(CUDA_NVCC_FLAGS_RELWITHDEBINFO  ; )
@@ -77,7 +77,7 @@ set(CUDA_NVCC_FLAGS_DEBUG  ; )
 set(CUDA_NVCC_FLAGS_MINSIZEREL  ; )
 set(CUDA_NVCC_FLAGS_RELEASE  ; )
 set(nvcc_flags -m64;--std;c++11) # list
-set(CUDA_NVCC_INCLUDE_ARGS "-I/home/suijingfeng/catkin_ws/libfreenect2/include/;-I/usr/local/cuda/samples/common/inc;-I/common/inc;-I/usr/local/cuda/include;-I/home/suijingfeng/catkin_ws/libfreenect2/include;-I/home/suijingfeng/catkin_ws/libfreenect2/include/internal;-I/home/suijingfeng/catkin_ws/libfreenect2/examples;-I/usr/include/libusb-1.0;-I/usr/include;-I/usr/include/libdrm") # list (needs to be in quotes to handle spaces properly).
+set(CUDA_NVCC_INCLUDE_ARGS "-I/home/suijingfeng/catkin_ws/libfreenect2/include/;-I/usr/local/cuda-8.0/samples/common/inc;-I/common/inc;-I/usr/local/cuda-8.0/include;-I/home/suijingfeng/catkin_ws/libfreenect2/include;-I/home/suijingfeng/catkin_ws/libfreenect2/include/internal;-I/home/suijingfeng/catkin_ws/libfreenect2/examples;-I/usr/include/libusb-1.0;-I/usr/include;-I/usr/include/libdrm;-I/usr/local/cuda-8.0/include") # list (needs to be in quotes to handle spaces properly).
 set(format_flag "-c") # string
 set(cuda_language_flag ) # list
 
@@ -87,7 +87,7 @@ endif()
 
 # This is the list of host compilation flags.  It C or CXX should already have
 # been chosen by FindCUDA.cmake.
-set(CMAKE_HOST_FLAGS  -Wall  )
+set(CMAKE_HOST_FLAGS  -Wall  -fno-exceptions )
 set(CMAKE_HOST_FLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG)
 set(CMAKE_HOST_FLAGS_DEBUG -g)
 set(CMAKE_HOST_FLAGS_MINSIZEREL -Os -DNDEBUG)

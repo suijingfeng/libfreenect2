@@ -1,19 +1,23 @@
-// Note that the following includes must be defined in order:
 // Note the the following Includes do not need to be defined in order:
 #include <cstdio>
 #include <map>
 #include <list>
 
+#include <chrono>
+#include <thread>
+
+// Note that the following includes must be defined in order:
 #define GLEW_STATIC
 #define GLEW_MX
-
 #include <GL/glew.h>
-
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 #include <iostream>
 
+// loading image
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 enum ExitCodes
 {
@@ -23,8 +27,8 @@ enum ExitCodes
 };
 
 
-const int c_iDefaultScreenWidth = 1280;
-const int c_iDefaultScreenHeight = 720;
+const int c_iDefaultScreenWidth = 640;
+const int c_iDefaultScreenHeight = 640;
 
 const char *c_szDefaultPrimaryWindowTitle = "Multi Window Demo - Primary Window";
 
@@ -46,7 +50,7 @@ const char *c_szVertexShader =""
 	"{" 
 		"vUV = UV;"
 		"vColour = Colour;"
-		"gl_Position = Projection * View * Model * Position;"
+		"gl_Position = Position;"
 	"}";
 
 const char *c_szPixelShader =""
@@ -61,7 +65,7 @@ const char *c_szPixelShader =""
 	
     "void main()"
 	"{"
-		"outColour = texture2D(diffuseTexture, vUV) + vColour;"
+		"outColour = texture(diffuseTexture, vUV) ;"
 	"}";
 
 
@@ -97,6 +101,7 @@ struct Vertex
 	glm::vec2 m_v2UV;
 	glm::vec4 m_v4Colour;
 };
+
 
 int Init();
 int MainLoop();
@@ -172,134 +177,10 @@ int Init()
 
 	// create our second window:
 	CreateWindow(c_iDefaultScreenWidth, c_iDefaultScreenHeight, 
-            "second", nullptr, hPrimaryWindow);
-	
+            "second", nullptr, nullptr);
+    //	hPrimaryWindow
 	MakeContextCurrent(hPrimaryWindow);
 
-	// create shader:
-	GLint iSuccess = 0;
-	GLchar acLog[256];
-	GLuint vsHandle = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fsHandle = glCreateShader(GL_FRAGMENT_SHADER);
-
-	glShaderSource(vsHandle, 1, &c_szVertexShader, 0);
-	glCompileShader(vsHandle);
-	glGetShaderiv(vsHandle, GL_COMPILE_STATUS, &iSuccess);
-	glGetShaderInfoLog(vsHandle, sizeof(acLog), 0, acLog);
-	if (iSuccess == GL_FALSE)
-	{
-		printf("Error: Failed to compile vertex shader!\n");
-		printf("%s\n", acLog);
-	}
-
-	glShaderSource(fsHandle, 1, &c_szPixelShader, 0);
-	glCompileShader(fsHandle);
-	glGetShaderiv(fsHandle, GL_COMPILE_STATUS, &iSuccess);
-	glGetShaderInfoLog(fsHandle, sizeof(acLog), 0, acLog);
-	if (iSuccess == GL_FALSE)
-	{
-		printf("Error: Failed to compile fragment shader!\n");
-		printf("%s\n", acLog);
-	}
-
-	g_Shader = glCreateProgram();
-	glAttachShader(g_Shader, vsHandle);
-	glAttachShader(g_Shader, fsHandle);
-	glDeleteShader(vsHandle);
-	glDeleteShader(fsHandle);
-
-	// specify Vertex Attribs:
-	glBindAttribLocation(g_Shader, 0, "Position");
-	glBindAttribLocation(g_Shader, 1, "UV");
-	glBindAttribLocation(g_Shader, 2, "Colour");
-    
-	glBindFragDataLocation(g_Shader, 0, "outColour");
-
-	glLinkProgram(g_Shader);
-	glGetProgramiv(g_Shader, GL_LINK_STATUS, &iSuccess);
-	glGetProgramInfoLog(g_Shader, sizeof(acLog), 0, acLog);
-	if (iSuccess == GL_FALSE)
-	{
-		printf("Error: failed to link Shader Program!\n");
-		printf("%s\n", acLog);
-	}
-
-	glUseProgram(g_Shader);
-
-	CheckForGLErrors("Shader Setup Error");
-
-	// create and load a texture:
-	glm::vec4 *texData = new glm::vec4[256 * 256];
-	for (int i = 0; i < 256 * 256; i += 256)
-	{
-		for (int j = 0; j < 256; ++j)
-		{
-			if (j % 2 == 0)
-			{
-				texData[i + j] = glm::vec4(0, 0, 0, 1);
-			}
-			else
-			{
-				texData[i + j] = glm::vec4(1, 1, 1, 1);
-			}
-		}
-	}
-
-	glGenTextures( 1, &g_Texture );
-	glBindTexture( GL_TEXTURE_2D, g_Texture );
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 256, 256, 0, GL_RGBA,
-            GL_FLOAT, texData);
-
-	CheckForGLErrors("Texture Generation Error");
-
-	// specify default filtering and wrapping
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
-	glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
-
-	// set the texture to use slot 0 in the shader
-	GLuint texUniformID = glGetUniformLocation(g_Shader, "diffuseTexture");
-	glUniform1i(texUniformID,0);
-
-	CheckForGLErrors("Texture Loading Error");
-
-	// cleanup Texture Data:
-	delete[] texData;
-	texData = nullptr; 
-
-	// now create a quad:
-	Vertex aoVertices[4];
-	aoVertices[0].m_v4Position = glm::vec4(-2 , 0, -2, 1);
-	aoVertices[0].m_v2UV = glm::vec2(0, 0);
-	aoVertices[0].m_v4Colour = glm::vec4(0, 1, 0, 1);
-	
-    aoVertices[1].m_v4Position = glm::vec4(2, 0, -2, 1);
-	aoVertices[1].m_v2UV = glm::vec2(1,0);
-	aoVertices[1].m_v4Colour = glm::vec4(1,0,0,1);
-	
-    aoVertices[2].m_v4Position = glm::vec4(2,0,2,1);
-	aoVertices[2].m_v2UV = glm::vec2(1,1);
-	aoVertices[2].m_v4Colour = glm::vec4(0,1,0,1);
-	
-    aoVertices[3].m_v4Position = glm::vec4(-2,0,2,1);
-	aoVertices[3].m_v2UV = glm::vec2(0,1);
-	aoVertices[3].m_v4Colour = glm::vec4(0,0,1,1);
-
-	unsigned int auiIndex[6] = {
-		3,1,0,
-		3,2,1 
-	};
-
-	// Create VBO/IBO
-	glGenBuffers(1, &g_VBO);
-	glGenBuffers(1, &g_IBO);
-	glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-	glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), 
-            auiIndex, GL_STATIC_DRAW);
 
 	// Now do window specific stuff, including:
 	// --> Creating a VAO with the VBO/IBO created above!
@@ -308,7 +189,145 @@ int Init()
 	for (auto window : g_lWindows)
 	{
 		MakeContextCurrent(window);
-		
+		//////////////////
+        // create shader:
+        GLint iSuccess = 0;
+        GLchar acLog[256];
+        GLuint vsHandle = glCreateShader(GL_VERTEX_SHADER);
+        GLuint fsHandle = glCreateShader(GL_FRAGMENT_SHADER);
+
+        glShaderSource(vsHandle, 1, &c_szVertexShader, 0);
+        glCompileShader(vsHandle);
+        glGetShaderiv(vsHandle, GL_COMPILE_STATUS, &iSuccess);
+        glGetShaderInfoLog(vsHandle, sizeof(acLog), 0, acLog);
+        if (iSuccess == GL_FALSE)
+        {
+            printf("Error: Failed to compile vertex shader!\n");
+            printf("%s\n", acLog);
+        }
+
+        glShaderSource(fsHandle, 1, &c_szPixelShader, 0);
+        glCompileShader(fsHandle);
+        glGetShaderiv(fsHandle, GL_COMPILE_STATUS, &iSuccess);
+        glGetShaderInfoLog(fsHandle, sizeof(acLog), 0, acLog);
+        if (iSuccess == GL_FALSE)
+        {
+            printf("Error: Failed to compile fragment shader!\n");
+            printf("%s\n", acLog);
+        }
+
+        g_Shader = glCreateProgram();
+        glAttachShader(g_Shader, vsHandle);
+        glAttachShader(g_Shader, fsHandle);
+        glDeleteShader(vsHandle);
+        glDeleteShader(fsHandle);
+
+        
+        // specify Vertex Attribs:
+        glBindAttribLocation(g_Shader, 0, "Position");
+        glBindAttribLocation(g_Shader, 1, "UV");
+        glBindAttribLocation(g_Shader, 2, "Colour");
+        
+        glBindFragDataLocation(g_Shader, 0, "outColour");
+
+        glLinkProgram(g_Shader);
+        glGetProgramiv(g_Shader, GL_LINK_STATUS, &iSuccess);
+        glGetProgramInfoLog(g_Shader, sizeof(acLog), 0, acLog);
+        if (iSuccess == GL_FALSE)
+        {
+            printf("Error: failed to link Shader Program!\n");
+            printf("%s\n", acLog);
+        }
+
+        glUseProgram(g_Shader);
+
+        CheckForGLErrors("Shader Setup Error");
+
+        // load a texture:
+        //
+        int width, height, nrChannels;
+        unsigned char *texData = nullptr;
+        if(window->m_uiID == 0)
+        {
+            texData=stbi_load(("../src/bricks2.jpg"),&width,&height, &nrChannels, 0);
+        }
+        else
+        {
+            texData=stbi_load(("../src/container.jpg"),&width,&height,&nrChannels, 0);
+        }
+
+        glGenTextures(1, &g_Texture );
+        glBindTexture(GL_TEXTURE_2D, g_Texture );
+
+        if (texData)
+        {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, 
+                    GL_UNSIGNED_BYTE, texData);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        else
+        {
+            std::cout << "Failed to load texture" << std::endl;
+        }
+
+        //	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 256, 256, 0, GL_RGBA,
+        //      GL_FLOAT, texData);
+
+        CheckForGLErrors("Texture Generation Error");
+  
+        // specify default filtering and wrapping
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT );
+        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
+ 
+        // set the texture to use slot 0 in the shader
+        GLuint texUniformID = glGetUniformLocation(g_Shader, "diffuseTexture");
+        glUniform1i(texUniformID, 0);
+
+        CheckForGLErrors("Texture Loading Error");
+
+        // cleanup Texture Data:
+        // delete[] texData;
+        //
+        stbi_image_free(texData);
+
+        // now create a quad:
+        Vertex aoVertices[4];
+
+        aoVertices[0].m_v4Position = glm::vec4(-0.99f, -0.99f, 0.0f, 1.0f);
+        aoVertices[0].m_v2UV = glm::vec2(0.0f, 0.0f);
+        aoVertices[0].m_v4Colour = glm::vec4(0, 1, 0, 1);
+        
+        aoVertices[1].m_v4Position = glm::vec4(0.99f, -0.99f, 0.0f, 1.0f);
+        aoVertices[1].m_v2UV = glm::vec2(1.0f, 0.0f);
+        aoVertices[1].m_v4Colour = glm::vec4(1, 0, 0, 1);
+        
+        aoVertices[2].m_v4Position = glm::vec4(0.99f, 0.99f, 0.0f, 1.0f);
+        aoVertices[2].m_v2UV = glm::vec2(1.0f, 1.0f);
+        aoVertices[2].m_v4Colour = glm::vec4(0, 1, 0, 1);
+        
+        aoVertices[3].m_v4Position = glm::vec4(-0.99f, 0.99f, 0.0f, 1.0f);
+        aoVertices[3].m_v2UV = glm::vec2(0.0f, 1.0f);
+        aoVertices[3].m_v4Colour = glm::vec4(0, 0, 1, 1);
+
+
+        unsigned int auiIndex[6] = {
+            0,1,3,
+            1,2,3 
+        };
+
+        // Create VBO/IBO
+        glGenBuffers(1, &g_VBO);
+        glGenBuffers(1, &g_IBO);
+        glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+
+        glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), 
+                auiIndex, GL_STATIC_DRAW);
+
+       
 		// Setup VAO:
 		g_mVAOs[window->m_uiID] = 0;
 		glGenVertexArrays(1, &(g_mVAOs[window->m_uiID]));
@@ -328,9 +347,9 @@ int Init()
 		CheckForGLErrors("Creating VAO Error");
 
 		// Setup Matrix:
-		window->m_m4Projection = glm::perspective(45.0f, 
+		window->m_m4Projection = glm::perspective(glm::radians(30.0f), 
                 float(window->m_uiWidth)/float(window->m_uiHeight), 0.1f, 1000.0f);
-		window->m_m4ViewMatrix = glm::lookAt(glm::vec3(window->m_uiID * 8,8,8), 
+		window->m_m4ViewMatrix = glm::lookAt(glm::vec3(window->m_uiID * 2, 2, 2), 
                 glm::vec3(0,0,0), glm::vec3(0,1,0));
 
 		// set OpenGL Options:
@@ -348,16 +367,18 @@ int Init()
 
 int MainLoop()
 {
-	while (!ShouldClose())
+	using namespace std::chrono_literals;
+    while (!ShouldClose())
 	{
-		// Keep Running!
+	    /*  
+        // Keep Running!
 		// get delta time for this iteration:
 		float fDeltaTime = (float)glfwGetTime();
 
 		glm::mat4 identity;
-		g_ModelMatrix = glm::rotate(identity, fDeltaTime * 10.0f, 
+		g_ModelMatrix = glm::rotate(identity, fDeltaTime * 1.0f, 
                 glm::vec3(0.0f, 1.0f, 0.0f) );
-
+        */
 		// draw each window in sequence:
 		for (const auto& window : g_lWindows)
 		{
@@ -366,8 +387,7 @@ int MainLoop()
 			// clear the backbuffer to our clear colour and clear the depth buffer
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			glUseProgram(g_Shader);
-
+            /*
 			GLuint ProjectionID = glGetUniformLocation(g_Shader, "Projection");
 			GLuint ViewID = glGetUniformLocation(g_Shader, "View");
 			GLuint ModelID = glGetUniformLocation(g_Shader, "Model");
@@ -378,16 +398,21 @@ int MainLoop()
                     glm::value_ptr(window->m_m4ViewMatrix) );
 			glUniformMatrix4fv(ModelID, 1, false, 
                     glm::value_ptr(g_ModelMatrix) );
-
-			glActiveTexture(GL_TEXTURE0);
+            */
+			glActiveTexture( GL_TEXTURE0 );
 			glBindTexture( GL_TEXTURE_2D, g_Texture );
-			glBindVertexArray(g_mVAOs[window->m_uiID]);
-			glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+            
+            glUseProgram(g_Shader);
+            glBindVertexArray( g_mVAOs[window->m_uiID] );
 
-			glfwSwapBuffers(window->m_pWindow);  
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+			glfwSwapBuffers(window->m_pWindow);
 
 			CheckForGLErrors("Render Error");
-		}
+
+            std::this_thread::sleep_for(20ms);
+        }
 
 		glfwPollEvents(); // process events!
 	}
@@ -506,7 +531,7 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight,
 	MakeContextCurrent(newWindow);
     // and must be made current too :)
  
-    //glewExperimental = true;
+    glewExperimental = true;
 	// Init GLEW for this context:
 	GLenum err = glewInit();
 
@@ -532,6 +557,10 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight,
 }
 
 
+// The MakeContextCurrent() function is a wrapper for the glfw3 
+// function glfwMakeContextCurrent(), it takes in our WindowHandle type and
+// makes sure to set g_hCurrentContext to the correct window when
+// it changes the context. This is how we track which context is active.
 void MakeContextCurrent(WindowHandle a_hWindowHandle)
 {
 	if (a_hWindowHandle != nullptr)

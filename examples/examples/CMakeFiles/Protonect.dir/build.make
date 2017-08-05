@@ -149,7 +149,8 @@ bin/Protonect: /usr/lib/x86_64-linux-gnu/libusb-1.0.so
 bin/Protonect: /usr/lib/x86_64-linux-gnu/libturbojpeg.so.0
 bin/Protonect: /usr/lib/x86_64-linux-gnu/libglfw.so
 bin/Protonect: /usr/lib/x86_64-linux-gnu/libGL.so
-bin/Protonect: /usr/local/cuda/lib64/libcudart_static.a
+bin/Protonect: /usr/local/cuda-8.0/lib64/libOpenCL.so
+bin/Protonect: /usr/local/cuda-8.0/lib64/libcudart_static.a
 bin/Protonect: /usr/lib/x86_64-linux-gnu/librt.so
 bin/Protonect: examples/CMakeFiles/Protonect.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/suijingfeng/catkin_ws/libfreenect2/examples/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable ../bin/Protonect"

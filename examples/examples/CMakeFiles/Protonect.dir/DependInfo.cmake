@@ -23,7 +23,7 @@ set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "."
   "/usr/include/libusb-1.0"
   "/usr/include/libdrm"
-  "/usr/local/cuda/include"
+  "/usr/local/cuda-8.0/include"
   "../src"
   )
 

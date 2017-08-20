@@ -86,51 +86,40 @@ void Viewer::initialize()
     std::string vertexshadersrc = ""
         "#version 330\n"
                                                 
-        "in vec2 Position;"
-        "in vec2 TexCoord;"
-                    
-        "out VertexData{"
-        "vec2 TexCoord;" 
-        "} FragmentIn;"
-                    
+        "layout(location=0) in vec2 Position;"
+        "layout(location=1) in vec2 TexCoord;"
+        "out vec2 UV;"
+
         "void main(void)"
         "{"
         "    gl_Position = vec4(Position, 0.0, 1.0);"
-        "    FragmentIn.TexCoord = TexCoord;"
+        "    UV = TexCoord;"
         "}";
     std::string grayfragmentshader = ""
         "#version 330\n"
         
-        "uniform sampler2DRect Data;"
-        
         "vec4 tempColor;"
+        "in vec2 UV;"
 
-        "in VertexData{"
-        "    vec2 TexCoord;"
-        "} FragmentIn;"
-        
         "layout(location = 0) out vec4 Color;"
+        "uniform sampler2DRect Data;"
         
         "void main(void)"
         "{"
-            "ivec2 uv = ivec2(FragmentIn.TexCoord.x, FragmentIn.TexCoord.y);"
+            "ivec2 uv = ivec2(UV.x, UV.y);"
             "tempColor = texelFetch(Data, uv);"
             "Color = vec4(tempColor.x/4500, tempColor.x/4500, tempColor.x/4500, 1);"
         "}";
     std::string fragmentshader = ""
         "#version 330\n"
         
-        "uniform sampler2DRect Data;"
-        
-        "in VertexData{"
-        "    vec2 TexCoord;"
-        "} FragmentIn;"
-       
         "layout(location = 0) out vec4 Color;"
+        "uniform sampler2DRect Data;"
+        "in vec2 UV;"
         
         "void main(void)"
         "{"
-        "    ivec2 uv = ivec2(FragmentIn.TexCoord.x, FragmentIn.TexCoord.y);"
+        "    ivec2 uv = ivec2(UV.x, UV.y);"
         "    Color = texelFetch(Data, uv);"
         "}";
 
@@ -208,18 +197,15 @@ bool Viewer::render()
 
         gl()->glBindVertexArray(triangle_vao);
         gl()->glBindBuffer(GL_ARRAY_BUFFER, triangle_vbo);
-        gl()->glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), 
-								  vertices, GL_STATIC_DRAW);
+        gl()->glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-        GLint position_attr = renderShader.getAttributeLocation("Position");
-        gl()->glVertexAttribPointer(position_attr, 2, GL_FLOAT, GL_FALSE, 
-				sizeof(Vertex), (GLvoid*)0 );
-        gl()->glEnableVertexAttribArray(position_attr);
+        // GLint position_attr = renderShader.getAttributeLocation("Position"); // =0
+        gl()->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)0 );
+        gl()->glEnableVertexAttribArray(0);
 
-        GLint texcoord_attr = renderShader.getAttributeLocation("TexCoord");
-        gl()->glVertexAttribPointer(texcoord_attr, 2, GL_FLOAT, GL_FALSE, 
-								   sizeof(Vertex), (GLvoid*)(2 * sizeof(float)) );
-        gl()->glEnableVertexAttribArray(texcoord_attr);
+        // GLint texcoord_attr = renderShader.getAttributeLocation("TexCoord"); // =1
+        gl()->glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (GLvoid*)(2 * sizeof(float)) );
+        gl()->glEnableVertexAttribArray(1);
 
 
         if (iter->first == "RGB" || iter->first == "registered")
@@ -240,8 +226,7 @@ bool Viewer::render()
             renderGrayShader.use();
 
             ir.allocate(frame->width, frame->height);
-            std::copy(frame->data, frame->data + 
-					frame->width * frame->height * frame->bytes_per_pixel, ir.data);
+            std::copy(frame->data, frame->data + frame->width * frame->height * frame->bytes_per_pixel, ir.data);
             ir.flipY();
             ir.upload();
             glDrawArrays(GL_TRIANGLES, 0, 6);

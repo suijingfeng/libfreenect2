@@ -9,7 +9,7 @@
 #ifndef _THREADINGDEMO_H_
 #define _THREADINGDEMO_H_
 
-#include "glm\glm.hpp"
+#include <glm/glm.hpp>
 
 ////////////////////////// Constants //////////////////////////////////
 const int c_iDefaultScreenWidth = 1280;

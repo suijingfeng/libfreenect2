@@ -1,6 +1,9 @@
 // Note that the following includes must be defined in order:
-#include "GL\glew.h"
-#include "GLFW\glfw3.h"
+#define GLEW_STATIC
+#define GLEW_MX
+
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include "ThreadingDemo.h"
 
 // Note the the following Includes do not need to be defined in order:
@@ -10,8 +13,8 @@
 #include <thread>
 #include <future>
 #include <atomic>
-#include "glm\glm.hpp"
-#include "glm\ext.hpp"
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include <iostream>
 
 // info: http://www.baptiste-wicht.com/2012/04/c11-concurrency-tutorial-advanced-locking-and-condition-variables/
@@ -53,7 +56,7 @@ int ShutDown();
 
 void GLFWErrorCallback(int a_iError, const char* a_szDiscription);
 void GLFWWindowSizeCallback(GLFWwindow* a_pWindow, int a_iWidth, int a_iHeight);
-void APIENTRY GLErrorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, void* userParam);
+void APIENTRY GLErrorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam);
 GLEWContext* glewGetContext();   // This needs to be defined for GLEW MX to work, along with the GLEW_MX define in the perprocessor!
 void CalcFPS(WindowHandle a_hWindowHandle);
 
@@ -164,8 +167,7 @@ int Init()
 	if (iSuccess == GL_FALSE)
 	{
 		printf("Error: Failed to compile vertex shader!\n");
-		printf(acLog);
-		printf("\n");
+		printf("%s\n", acLog);
 	}
 
 	glShaderSource(fsHandle, 1, (const char**)&c_szPixelShader, 0);
@@ -175,8 +177,7 @@ int Init()
 	if (iSuccess == GL_FALSE)
 	{
 		printf("Error: Failed to compile fragment shader!\n");
-		printf(acLog);
-		printf("\n");
+	    printf("%s\n", acLog);
 	}
 
 	g_Shader = glCreateProgram();
@@ -197,9 +198,8 @@ int Init()
 	if (iSuccess == GL_FALSE)
 	{
 		printf("Error: failed to link Shader Program!\n");
-		printf(acLog);
-		printf("\n");
-	}
+		printf("%s\n", acLog);
+    }
 
 	glUseProgram(g_Shader);
 
@@ -290,7 +290,7 @@ int MainLoop()
 		float fTime = (float)glfwGetTime();   // get time for this iteration
 
 		glm::mat4 identity;
-		g_ModelMatrix = glm::rotate(identity, fTime * 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		g_ModelMatrix = glm::rotate(identity, fTime , glm::vec3(0.0f, 1.0f, 0.0f));
 
 		// simulate work:
 		if (g_bDoWork)
@@ -350,7 +350,7 @@ int MainLoopBAD()
 		float fDeltaTime = (float)glfwGetTime();
 
 		glm::mat4 identity;
-		g_ModelMatrix = glm::rotate(identity, fDeltaTime * 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		g_ModelMatrix = glm::rotate(identity, fDeltaTime, glm::vec3(0.0f, 1.0f, 0.0f));
 
 		// render threaded.
 		std::thread renderWindow2(&Render, g_hSecondaryWindow);
@@ -387,7 +387,7 @@ int MainLoopTHREADED()
 		float fDeltaTime = (float)glfwGetTime();
 
 		glm::mat4 identity;
-		g_ModelMatrix = glm::rotate(identity, fDeltaTime * 10.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		g_ModelMatrix = glm::rotate(identity, fDeltaTime*4, glm::vec3(0.0f, 1.0f, 0.0f));
 
 		// simulate work:
 		if (g_bDoWork)
@@ -607,10 +607,13 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight, const std::string& a_szTi
     if (GLEW_ARB_debug_output) // test to make sure we can use the new callbacks, they wer added as an extgension in 4.1 and as a core feture in 4.3
     {
             #ifdef _DEBUG
-            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);                        // this allows us to set a break point in the callback function, no point to it if in release mode.
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+            // this allows us to set a break point in the callback function, no point to it if in release mode.
             #endif
-            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);        // tell openGl what errors we want (all).
-            glDebugMessageCallback(GLErrorCallback, NULL);                        // define the callback function.
+            glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL, GL_TRUE);
+            // tell openGl what errors we want (all).
+            glDebugMessageCallback(GLErrorCallback, NULL);
+            // define the callback function.
     }
 
 	// add new window to the map and increment handle counter:
@@ -681,7 +684,7 @@ Quad CreateQuad()
 	geom.m_uiIndicies[4] = 2;
 	geom.m_uiIndicies[5] = 1;
 
-	printf("Created quad on thread ID: %i\n", std::this_thread::get_id());
+    std::cout << "Created quad on thread ID: "<< std::this_thread::get_id() <<std::endl;
 
 	return geom;
 }
@@ -693,7 +696,7 @@ void GLFWErrorCallback(int a_iError, const char* a_szDiscription)
 }
 
 
-void APIENTRY GLErrorCallback(GLenum /* source */, GLenum type, GLuint id, GLenum severity, GLsizei /* length */, const GLchar* message, void* /* userParam */)
+void  GLErrorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
 {
 	std::cout << "---------------------opengl-callback-start------------" << std::endl;
 	std::cout << "Message: " << message << std::endl;

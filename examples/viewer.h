@@ -89,6 +89,10 @@ public:
         glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexImage2D(GL_TEXTURE_RECTANGLE, 0, FormatT::InternalFormat, width, height,
 										   0, FormatT::Format, FormatT::Type, 0);
+
+        //std::cout << "InternalFormat: " << FormatT::InternalFormat <<", " 
+        //          << "FormatT::Format " << FormatT::Format <<", " 
+        //          << "Type: " << FormatT::Type << std::endl;
     }
 
     void deallocate()
@@ -104,47 +108,39 @@ public:
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         glTexSubImage2D(GL_TEXTURE_RECTANGLE, /*level*/0, /*xoffset*/0, /*yoffset*/0,
 						width, height, FormatT::Format, FormatT::Type, data);
-    }
-
-    void download()
-    {
-        downloadToBuffer(data);
-    }
-
-    void downloadToBuffer(unsigned char *data)
-    {
-        glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, data);
+        // std::cout << "Format: " << FormatT::Format << "Type: " << FormatT::Type << std::endl;
     }
 
     void flipY()
     {
-        flipYBuffer(data);
-    }
+        size_t linestep = width * bytes_per_pixel;
 
-    void flipYBuffer(unsigned char *data)
-    {
-        size_t linestep = width * bytes_per_pixel / sizeof(unsigned char);
-
-        unsigned char *first_line = reinterpret_cast<unsigned char *>(data); 
+        unsigned char *first_line = data; 
 		unsigned char *last_line = first_line + (height - 1) * linestep;
+        
+        unsigned char *tmp_line = new unsigned char[linestep];
 
         for (size_t y = 0; y < height / 2; ++y)
-        {
-            for (size_t x = 0; x < linestep; ++x, ++first_line, ++last_line)
-            {
-                std::swap(*first_line, *last_line);
-            }
-            last_line -= 2 * linestep;
+        {      
+            std::copy(first_line, first_line + linestep, tmp_line);
+            std::copy(last_line, last_line + linestep ,first_line);
+            std::copy(tmp_line, tmp_line + linestep ,last_line);
+            first_line += linestep;
+            last_line -= linestep;
         }
+        delete[] tmp_line;
+    }
+
+    void download()
+    {
+        glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, data);
     }
 
     libfreenect2::Frame *downloadToNewFrame()
     {
-        libfreenect2::Frame *f = new libfreenect2::Frame(
-				width, height, bytes_per_pixel);
-        downloadToBuffer(f->data);
-        flipYBuffer(f->data);
-
+        libfreenect2::Frame *f = new libfreenect2::Frame(width, height, bytes_per_pixel);
+        glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, f->data);
+        // flipY();
         return f;
     }
 };

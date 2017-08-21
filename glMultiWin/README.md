@@ -6,7 +6,8 @@ Code for my tutorials on using GLFW3.
 
 [This tutorial](http://blog.gvnott.com/2013/05/18/tutorial-multiple-windows-with-glfw3-and-glew-mx/) shows how to get mulitpuls windows going with GLFW3 and GLEW MX. and I modify it to show rgb image and depth image with two seperate windows.
 
-![](https://github.com/suijingfeng/libfreenect2/tree/master/glMultiWin/doc/succeed.png)
+![](https://github.com/suijingfeng/libfreenect2/blob/master/glMultiWin/doc/succeed.png)
+
 
 ## Extra: Multi-Threaded Demo
 

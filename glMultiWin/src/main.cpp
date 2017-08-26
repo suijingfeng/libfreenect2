@@ -19,33 +19,17 @@
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
 
-// loading image
+// a light image loading/saving lib 
 // #define STB_IMAGE_IMPLEMENTATION
 // #include "stb_image.h"
  
 
-/// freenect2 /////////////////////
+////////////////// freenect2 /////////////////////
 libfreenect2::Freenect2 freenect2;
 libfreenect2::Freenect2Device *dev = 0;
 libfreenect2::PacketPipeline *pipeline = 0;
-/// [context]
-
 std::string serial = "";
-bool enable_rgb = true;
-bool enable_depth = true;
-
-//int deviceId = -1;
-//size_t framemax = -1;
-
 libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth);
-
-
-enum ExitCodes
-{
-	EC_NO_ERROR = 0,
-	EC_GLFW_INIT_FAIL = 1,
-	EC_GLFW_FIRST_WINDOW_CREATION_FAIL = 2,
-};
 
 
 const char *c_szVertexShader =""
@@ -92,17 +76,6 @@ const char *c_szDepthPixelShader = ""
         "outColour = vec4(tempColor.x/4500, tempColor.x/4500, tempColor.x/4500, 1);"
     "}";
 
-struct Window
-{
-	GLFWwindow*		m_pWindow;
-	GLEWContext*	m_pGLEWContext;
-	unsigned int	m_uiWidth;
-	unsigned int	m_uiHeight;
-	glm::mat4		m_m4Projection;
-	glm::mat4		m_m4ViewMatrix;
-
-	unsigned int	m_uiID;
-};
 
 struct ShaderProgram
 {
@@ -190,8 +163,15 @@ struct ShaderProgram
         glUseProgram(program);
     }
 
-    // load a texture:
-    //printf("GL_RGBA: %d, GL_BGRA: %d, GL_UNSIGNED_BYTE: %d\n", GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
+    void render()
+    {
+        glUseProgram(program);
+
+        glPixelStorei( GL_UNPACK_ALIGNMENT, 1);
+        glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, width, height, format, type, texture_buffer); 
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+    }
 
     void setTexture()
     {
@@ -205,17 +185,6 @@ struct ShaderProgram
         glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT );
                 
         glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, texture_buffer);
-    }
-
- 
-    void loadTexture(size_t new_width, size_t new_height)
-    {
-        /*
-        width = new_width;
-        height = new_height;
-        size = height * width * bytes_per_pixel;
-        data = new unsigned char[size];
-         */
     }
 
     GLint getAttributeLocation(const char* name)
@@ -249,29 +218,53 @@ struct ShaderProgram
         //glUniformMatrix4fv(ViewID, 1, false, glm::value_ptr(window->m_m4ViewMatrix) );
 		//glUniformMatrix4fv(ModelID, 1, false, glm::value_ptr(g_ModelMatrix) );
     }
+
+    
+    void textureFlipY()
+    {
+        unsigned int linestep = width * bytes_per_pixel;
+
+        unsigned char *first_line = texture_buffer;
+        unsigned char *last_line = first_line + (height - 1) * linestep;
+        unsigned char *tmp_line = new unsigned char[linestep];
+
+        for (size_t y = 0; y < height/2; ++y)
+        {      
+            std::copy(first_line, first_line + linestep, tmp_line);
+            std::copy(last_line, last_line + linestep ,first_line);
+            std::copy(tmp_line, tmp_line + linestep ,last_line);
+            first_line += linestep;
+            last_line -= linestep;
+        }
+        delete[] tmp_line;
+    }
 };
 
 
+struct Window
+{
+	GLFWwindow*		m_pWindow;
+	GLEWContext*	m_pGLEWContext;
+	unsigned int	m_uiWidth;
+	unsigned int	m_uiHeight;
+	glm::mat4		m_m4Projection;
+	glm::mat4		m_m4ViewMatrix;
+    static unsigned int	g_uiWindowCounter;
+	unsigned int	m_uiID;
+};
+
 typedef Window*	WindowHandle;
+unsigned int Window::g_uiWindowCounter = 0;
+Window*		    g_hCurrentContext = nullptr;
 
-unsigned int			g_uiWindowCounter = 0;
-std::list<WindowHandle>	g_lWindows;
-WindowHandle			g_hCurrentContext = nullptr;
+Window*         rgbWin;
+ShaderProgram   rgbShader(1920, 1080, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
 
-Window*            rgbWin;
-ShaderProgram      rgbShader(1920, 1080, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
+Window*         depthWin;
+ShaderProgram   depthShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
 
-Window*            depthWin;
-ShaderProgram      depthShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
-
-Window*            irWin;
-Window*            cloudWin;
-
-
-std::map<unsigned int, unsigned int> g_mVAOs;
-unsigned int g_VBO = 0;
-unsigned int g_IBO = 0;
-//unsigned int g_Shader = 0;
+//Window*            irWin;
+//Window*            cloudWin;
 //glm::mat4	 g_ModelMatrix;
 
 struct Vertex
@@ -279,368 +272,6 @@ struct Vertex
 	glm::vec4 m_v4Position;
 	glm::vec2 m_v2UV;
 };
-
-
-int Init();
-int MainLoop();
-
-void GLFWErrorCallback(int a_iError, const char* a_szDiscription);
-void GLFWWindowSizeCallback(GLFWwindow* a_pWindow, int a_iWidth, int a_iHeight);
-GLEWContext* glewGetContext();
-
-// This needs to be defined for GLEW MX to work, 
-// along with the GLEW_MX define in the perprocessor!
-void MakeContextCurrent(WindowHandle a_hWindowHandle);
-
-WindowHandle CreateWindow(int a_iWidth, int a_iHeight, 
-                          const std::string& a_szTitle, 
-                          GLFWmonitor* a_pMonitor, WindowHandle a_hShare);
-
-bool ShouldClose();
-void CheckForGLErrors(std::string a_szMessage);
-
-
-int libfreenectInfo()
-{
-    //std::string program_path(argv[0]);
-    printf( "Version: %s\n", LIBFREENECT2_VERSION );
-
-    /// [discovery]
-    if(freenect2.enumerateDevices() == 0)
-    {
-        printf("no device connected!\n");
-        return -1;
-    }
-
-    if (serial == "")
-    {
-        serial = freenect2.getDefaultDeviceSerialNumber();
-        printf("device serial: %s\n", serial.c_str());
-    }
-
-    if(!pipeline)
-    {
-        // pipeline = new libfreenect2::CpuPacketPipeline();
-        pipeline = new libfreenect2::OpenGLPacketPipeline();
-        // pipeline = new libfreenect2::CudaPacketPipeline(0);
-    }
-    if(pipeline)
-    {
-        dev = freenect2.openDevice(serial, pipeline);
-    } 
-    else
-    {
-        dev = freenect2.openDevice(serial);
-    }
-    if(dev == 0)
-    {
-        printf("failure opening device\n");
-        return -1;
-    }
- 
-    dev->setColorFrameListener(&listener);
-    dev->setIrAndDepthFrameListener(&listener);
-
-    if (enable_rgb && enable_depth)
-    {
-        if (!dev->start())
-            return -1;
-    }
-    else
-    {
-        if (!dev->startStreams(enable_rgb, enable_depth))
-           return -1;
-    }
-
-  return 1;
-}
-
-
-int main()
-{
-    int iReturnCode = EC_NO_ERROR;
-
-	iReturnCode = Init();
-	if (iReturnCode != EC_NO_ERROR)
-		return iReturnCode;
-
-    libfreenectInfo();
-
-	iReturnCode = MainLoop();
-	if (iReturnCode != EC_NO_ERROR)
-		return iReturnCode;
-
-    return iReturnCode;
-}
-
-
-int Init()
-{
-	// Setup Our GLFW error callback, 
-    // we do this before Init so we know what goes wrong with init if it fails:
-	glfwSetErrorCallback(GLFWErrorCallback);
-
-	// Init GLFW:
-	if (!glfwInit())
-		return EC_GLFW_INIT_FAIL;
-
-	// create our first window:
-	rgbWin = CreateWindow(960, 540, "rgb", nullptr, nullptr);
-	
-	if (rgbWin == nullptr)
-	{
-		glfwTerminate();
-		return EC_GLFW_FIRST_WINDOW_CREATION_FAIL;
-	}
-
-	// Print out GLFW, OpenGL version and GLEW Version:
-	int iOpenGLMajor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MAJOR);
-	int iOpenGLMinor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MINOR);
-	int iOpenGLRevision = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_REVISION);
-	
-    printf("Status: Using GLFW Version %s\n", glfwGetVersionString() );
-	printf("Status: Using OpenGL Version: %i.%i, Revision: %i\n", iOpenGLMajor, iOpenGLMinor, iOpenGLRevision);
-	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION) );
-
-	// create our second window:
-	depthWin = CreateWindow(512, 424, "depth", nullptr, nullptr);
-
-
-    /////////////////////////// rgbWin ////////////////////////////
-	MakeContextCurrent(rgbWin);
-    
-    rgbShader.setShader(c_szVertexShader, c_szRgbPixelShader);
-    rgbShader.build();
-    rgbShader.use();
-    // set the texture to use slot 0 in the shader
-    rgbShader.setUniform("diffuseTexture", 0);
-    CheckForGLErrors("Texture Loading Error"); 
-   
-
-    /////////////////////////// depthWin ////////////////////////////
-	MakeContextCurrent(depthWin);
-    depthShader.setShader(c_szVertexShader, c_szDepthPixelShader);
-    depthShader.build();
-    depthShader.use();
-    
-    // set the texture to use slot 0 in the shader
-    depthShader.setUniform("Data", 0);   
-    CheckForGLErrors("Texture Loading Error");
-
-    return EC_NO_ERROR;
-}
-
-
-void flipY(size_t width, size_t height, size_t bytes_per_pixel, unsigned char * data)
-{
-    size_t linestep = width * bytes_per_pixel;
-
-    unsigned char *first_line = data; 
-    unsigned char *last_line = first_line + (height - 1) * linestep;
-    
-    unsigned char *tmp_line = new unsigned char[linestep];
-
-    for (size_t y = 0; y < height / 2; ++y)
-    {      
-        std::copy(first_line, first_line + linestep, tmp_line);
-        std::copy(last_line, last_line + linestep ,first_line);
-        std::copy(tmp_line, tmp_line + linestep ,last_line);
-        first_line += linestep;
-        last_line -= linestep;
-    }
-    delete[] tmp_line;
-}
-
-
-int MainLoop()
-{
-
-    bool rgbWinClosed = false;
-    bool depthWinClosed = false;
-    // now create a quad:
-    Vertex aoVertices[4];
-
-    aoVertices[0].m_v4Position = glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f);
-    aoVertices[0].m_v2UV = glm::vec2(0.0f, 0.0f);
-
-    aoVertices[1].m_v4Position = glm::vec4(1.0f, -1.0f, 0.0f, 1.0f);
-    aoVertices[1].m_v2UV = glm::vec2(1.0f, 0.0f);
-    
-    aoVertices[2].m_v4Position = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-    aoVertices[2].m_v2UV = glm::vec2(1.0f, 1.0f);
-    
-    aoVertices[3].m_v4Position = glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f);
-    aoVertices[3].m_v2UV = glm::vec2(0.0f, 1.0f);
-
-    unsigned int auiIndex[6] = { 0,1,3,   1,2,3 };
-
-
-    /////////////////////////////////////////////////////////////////////////////////
-    MakeContextCurrent(rgbWin);
-
-    // Create VBO/IBO
-    glGenBuffers(1, &g_VBO);
-    glGenBuffers(1, &g_IBO);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
-
-    
-    // Setup VAO:
-    // g_mVAOs[rgbWin->m_uiID] = 0;
-    glGenVertexArrays(1, &(g_mVAOs[rgbWin->m_uiID]));
-    glBindVertexArray(g_mVAOs[rgbWin->m_uiID]);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
-
-    CheckForGLErrors("Creating VAO Error");
-    
-    // set OpenGL Options:
-    glViewport(0, 0, rgbWin->m_uiWidth, rgbWin->m_uiHeight);
-    glClearColor(0.25f, 0.25f, 0.25f, 1);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    CheckForGLErrors("OpenGL Options Error");
-
-
-    ///////////////////////////////////////////////////////////////////////////////
-    MakeContextCurrent(depthWin);
-  
-    // Create VBO/IBO
-    glGenBuffers(1, &g_VBO);
-    glGenBuffers(1, &g_IBO);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
-
-    // Setup VAO:
-    g_mVAOs[depthWin->m_uiID] = 0;
-    glGenVertexArrays(1, &(g_mVAOs[depthWin->m_uiID]));
-    glBindVertexArray(g_mVAOs[depthWin->m_uiID]);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    CheckForGLErrors("Creating VAO Error");
-    
-    // set OpenGL Options:
-    glViewport(0, 0, depthWin->m_uiWidth, depthWin->m_uiHeight);
-    glClearColor(0.25f, 0.25f, 0.25f, 1);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    CheckForGLErrors("OpenGL Options Error");
-
-
-
-	while ( !rgbWinClosed || !depthWinClosed )
-	{
-        libfreenect2::FrameMap frames;
-        if (!listener.waitForNewFrame(frames, 5*1000)) // 10 sconds
-        {
-            printf("timeout!\n");
-            return -1;
-        }
-
-        libfreenect2::Frame *depth =  frames[libfreenect2::Frame::Depth];
-        libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
-
-        // draw each window in sequence:
-
-		if (!glfwWindowShouldClose(rgbWin->m_pWindow))
-		{
-			MakeContextCurrent(rgbWin);
-            
-            std::copy(rgb->data, rgb->data + rgb->width * rgb->height * rgb->bytes_per_pixel, rgbShader.texture_buffer);
-            flipY(rgb->width, rgb->height, rgb->bytes_per_pixel, rgbShader.texture_buffer);
-
-            // clear the backbuffer to our clear colour and clear the depth buffer
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            rgbShader.setTexture();
-            rgbShader.use();
-            glBindVertexArray( g_mVAOs[rgbWin->m_uiID] );
-    
-            glPixelStorei( GL_UNPACK_ALIGNMENT, 1);
-            glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, rgb->width, rgb->height, GL_BGRA, GL_UNSIGNED_BYTE, rgbShader.texture_buffer);
-               
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            glfwSwapBuffers(rgbWin->m_pWindow);
-            CheckForGLErrors("Render Error");
-            glfwPollEvents(); // process events!
-		}
-        else
-        {
-            if(!rgbWinClosed)
-            {
-                delete rgbWin->m_pGLEWContext;
-			    glfwDestroyWindow(rgbWin->m_pWindow);
-                rgbWinClosed = true;
-            }
-        }
-
-		if (!glfwWindowShouldClose(depthWin->m_pWindow))
-        {
-            MakeContextCurrent(depthWin);
-        
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            std::copy(depth->data, depth->data + depth->width * depth->height * depth->bytes_per_pixel, depthShader.texture_buffer);
-            flipY(depth->width, depth->height, depth->bytes_per_pixel, depthShader.texture_buffer);
-
-			//glActiveTexture( GL_TEXTURE0 );
-	    	depthShader.setTexture();
-            depthShader.use();
-            //libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
-
-            glBindVertexArray( g_mVAOs[depthWin->m_uiID] );
-            glPixelStorei( GL_UNPACK_ALIGNMENT, 1);
-            glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 512, 424, GL_RED, GL_FLOAT, depthShader.texture_buffer);
-      
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-			glfwSwapBuffers(depthWin->m_pWindow);
-            CheckForGLErrors("Render Error");
-            glfwPollEvents(); // process events!
-        }
-        else
-        {
-            if(!depthWinClosed)
-            {
-                delete depthWin->m_pGLEWContext;
-			    glfwDestroyWindow(depthWin->m_pWindow);
-                depthWinClosed = true;
-            }
-        }
-     
-        // IMPORTANT£¡
-        listener.release(frames);
-	}
-   
-    glDeleteBuffers(1, &g_VBO);
-    glDeleteBuffers(1, &g_IBO);
-
-    glDeleteVertexArrays(1, &g_mVAOs[depthWin->m_uiID]);
-    glDeleteVertexArrays(1, &g_mVAOs[rgbWin->m_uiID]);
- 
-    dev->stop();
-    dev->close();
-
-    delete rgbWin;
-    delete depthWin;
-	return EC_NO_ERROR;
-}
 
 
 void GLFWErrorCallback(int a_iError, const char* a_szDiscription)
@@ -651,23 +282,23 @@ void GLFWErrorCallback(int a_iError, const char* a_szDiscription)
 
 void GLFWWindowSizeCallback(GLFWwindow* a_pWindow, int a_iWidth, int a_iHeight)
 {
-	// find the window data corrosponding to a_pWindow;
-	WindowHandle window = nullptr;
-	for (auto& itr : g_lWindows)
-	{
-		if (itr->m_pWindow == a_pWindow)
-		{
-			window = itr;
-			window->m_uiWidth = a_iWidth;
-			window->m_uiHeight = a_iHeight;
-			// window->m_m4Projection = glm::perspective(45.0f, float(a_iWidth)/float(a_iHeight), 0.1f, 1000.0f);
-		}
-	}
-
-	WindowHandle previousContext = g_hCurrentContext;
-	MakeContextCurrent(window);
-	glViewport(0, 0, a_iWidth, a_iHeight);
-	MakeContextCurrent(previousContext);
+    if(a_pWindow == rgbWin->m_pWindow)
+    {
+        rgbWin->m_uiWidth = a_iWidth;
+		rgbWin->m_uiHeight = a_iHeight;
+        glfwMakeContextCurrent(rgbWin->m_pWindow);
+        glViewport(0, 0, a_iWidth, a_iHeight);
+        g_hCurrentContext = rgbWin;
+    }
+    else if(a_pWindow == depthWin->m_pWindow)
+    {
+        depthWin->m_uiWidth = a_iWidth;
+		depthWin->m_uiHeight = a_iHeight;
+        glfwMakeContextCurrent(depthWin->m_pWindow);
+        glViewport(0, 0, a_iWidth, a_iHeight);
+        g_hCurrentContext = depthWin;
+    }
+    else{ }
 }
 
 
@@ -676,9 +307,35 @@ GLEWContext* glewGetContext()
 	return g_hCurrentContext->m_pGLEWContext;
 }
 
+// This needs to be defined for GLEW MX to work, 
+// along with the GLEW_MX define in the perprocessor!
+// The MakeContextCurrent() function is a wrapper for the glfw3 
+// function glfwMakeContextCurrent(), it takes in our WindowHandle type and
+// makes sure to set g_hCurrentContext to the correct window when
+// it changes the context. This is how we track which context is active.
+//void MakeContextCurrent(WindowHandle a_hWindowHandle);
+void MakeContextCurrent(WindowHandle a_hWindowHandle)
+{
+	if (a_hWindowHandle != nullptr)
+	{
+		glfwMakeContextCurrent(a_hWindowHandle->m_pWindow);
+		g_hCurrentContext = a_hWindowHandle;
+	}
+}
 
-WindowHandle CreateWindow(int a_iWidth, int a_iHeight, 
-        const std::string& a_szTitle, GLFWmonitor* a_pMonitor, WindowHandle a_hShare)
+
+void CheckForGLErrors(std::string a_szMessage)
+{
+	GLenum error = glGetError();
+	while (error != GL_NO_ERROR)
+	{
+		printf("Error: %s, ErrorID: %i: %s\n", a_szMessage.c_str(), error, gluErrorString(error));
+		error = glGetError(); // get next error if any.
+	}
+}
+
+
+WindowHandle CreateWindow(int a_iWidth, int a_iHeight, const std::string& a_szTitle, GLFWmonitor* a_pMonitor, WindowHandle a_hShare)
 {
 	// save current active context info so we can restore it later!
 	WindowHandle hPreviousContext = g_hCurrentContext;
@@ -692,7 +349,7 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight,
 	newWindow->m_pWindow = nullptr;
 
     // set ID and Increment Counter!
-	newWindow->m_uiID = g_uiWindowCounter++;
+	newWindow->m_uiID = Window::g_uiWindowCounter++;
 	newWindow->m_uiWidth = a_iWidth;
 	newWindow->m_uiHeight = a_iHeight;
 
@@ -749,36 +406,287 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight,
 	// setup callbacks:
 	glfwSetWindowSizeCallback(newWindow->m_pWindow, GLFWWindowSizeCallback);
 
-	// add new window to list:
-	g_lWindows.push_back(newWindow);
-
 	// now restore previous context:
 	MakeContextCurrent(hPreviousContext);
 	return newWindow;
 }
 
 
-// The MakeContextCurrent() function is a wrapper for the glfw3 
-// function glfwMakeContextCurrent(), it takes in our WindowHandle type and
-// makes sure to set g_hCurrentContext to the correct window when
-// it changes the context. This is how we track which context is active.
-void MakeContextCurrent(WindowHandle a_hWindowHandle)
+int libfreenectInfo()
 {
-	if (a_hWindowHandle != nullptr)
-	{
-		glfwMakeContextCurrent(a_hWindowHandle->m_pWindow);
-		g_hCurrentContext = a_hWindowHandle;
-	}
+    bool enable_rgb = true;
+    bool enable_depth = true;
+    //std::string program_path(argv[0]);
+    printf( "Version: %s\n", LIBFREENECT2_VERSION );
+
+    /// [discovery]
+    if(freenect2.enumerateDevices() == 0)
+    {
+        printf("no device connected!\n");
+        return -1;
+    }
+
+    if (serial == "")
+    {
+        serial = freenect2.getDefaultDeviceSerialNumber();
+        printf("device serial: %s\n", serial.c_str());
+    }
+
+    if(!pipeline)
+    {
+        // pipeline = new libfreenect2::CpuPacketPipeline();
+        pipeline = new libfreenect2::OpenGLPacketPipeline();
+        // pipeline = new libfreenect2::CudaPacketPipeline(0);
+    }
+    if(pipeline)
+    {
+        dev = freenect2.openDevice(serial, pipeline);
+    } 
+    else
+    {
+        dev = freenect2.openDevice(serial);
+    }
+    if(dev == 0)
+    {
+        printf("failure opening device\n");
+        return -1;
+    }
+ 
+    dev->setColorFrameListener(&listener);
+    dev->setIrAndDepthFrameListener(&listener);
+
+    if (enable_rgb && enable_depth)
+    {
+        if (!dev->start())
+            return -1;
+    }
+    else
+    {
+        if (!dev->startStreams(enable_rgb, enable_depth))
+           return -1;
+    }
+
+  return 1;
 }
 
 
-void CheckForGLErrors(std::string a_szMessage)
+int MainLoop()
 {
-	GLenum error = glGetError();
-	while (error != GL_NO_ERROR)
+    unsigned int g_VBO = 0;
+    unsigned int g_IBO = 0;
+    std::map<unsigned int, unsigned int> g_mVAOs;
+    bool rgbWinClosed = false;
+    bool depthWinClosed = false;
+    // now create a quad:
+    Vertex aoVertices[4];
+
+    aoVertices[0].m_v4Position = glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f);
+    aoVertices[0].m_v2UV = glm::vec2(0.0f, 0.0f);
+
+    aoVertices[1].m_v4Position = glm::vec4(1.0f, -1.0f, 0.0f, 1.0f);
+    aoVertices[1].m_v2UV = glm::vec2(1.0f, 0.0f);
+    
+    aoVertices[2].m_v4Position = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+    aoVertices[2].m_v2UV = glm::vec2(1.0f, 1.0f);
+    
+    aoVertices[3].m_v4Position = glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f);
+    aoVertices[3].m_v2UV = glm::vec2(0.0f, 1.0f);
+
+    unsigned int auiIndex[6] = { 0,1,3,   1,2,3 };
+
+    // Create VBO/IBO
+    glGenBuffers(1, &g_VBO);
+    glGenBuffers(1, &g_IBO);
+
+    /////////////////////////////////////////////////////////////////////////////////
+    MakeContextCurrent(rgbWin);
+
+    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
+
+    // Setup VAO:
+    g_mVAOs[rgbWin->m_uiID] = 0;
+    glGenVertexArrays(1, &(g_mVAOs[rgbWin->m_uiID]));
+    glBindVertexArray(g_mVAOs[rgbWin->m_uiID]);
+    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
+
+    CheckForGLErrors("Creating VAO Error");
+    
+    // set OpenGL Options:
+    //glViewport(0, 0, rgbWin->m_uiWidth, rgbWin->m_uiHeight);
+    //glClearColor(0.25f, 0.25f, 0.25f, 1);
+    //glEnable(GL_DEPTH_TEST);
+    //glEnable(GL_CULL_FACE);
+    //CheckForGLErrors("OpenGL Options Error");
+
+    ///////////////////////////////////////////////////////////////////////////////
+    MakeContextCurrent(depthWin);
+  
+    // Create VBO/IBO
+    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
+
+    // Setup VAO:
+    g_mVAOs[depthWin->m_uiID] = 1;
+
+    glGenVertexArrays(1, &(g_mVAOs[depthWin->m_uiID]));
+    glBindVertexArray(g_mVAOs[depthWin->m_uiID]);
+    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    CheckForGLErrors("Creating VAO Error");
+    
+
+	while ( !rgbWinClosed || !depthWinClosed )
 	{
-		printf("Error: %s, ErrorID: %i: %s\n", 
-                a_szMessage.c_str(), error, gluErrorString(error));
-		error = glGetError(); // get next error if any.
+        libfreenect2::FrameMap frames;
+        if (!listener.waitForNewFrame(frames, 5*1000)) // 10 sconds
+        {
+            printf("timeout!\n");
+            return -1;
+        }
+
+        libfreenect2::Frame *depth =  frames[libfreenect2::Frame::Depth];
+        libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
+        //libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
+        // draw each window in sequence:
+
+		if (!glfwWindowShouldClose(rgbWin->m_pWindow))
+		{
+			MakeContextCurrent(rgbWin);
+            // clear the backbuffer to our clear colour and clear the depth buffer
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            std::copy(rgb->data, rgb->data + rgb->width * rgb->height * rgb->bytes_per_pixel, rgbShader.texture_buffer);
+            rgbShader.textureFlipY();
+            rgbShader.setTexture();
+            rgbShader.render();
+
+            //glBindVertexArray( g_mVAOs[rgbWin->m_uiID] );
+            glfwSwapBuffers(rgbWin->m_pWindow);
+            CheckForGLErrors("Render Error");
+            
+            glfwPollEvents(); // process events!
+		}
+        else
+        {
+            if(!rgbWinClosed)
+            {
+                delete rgbWin->m_pGLEWContext;
+			    glfwDestroyWindow(rgbWin->m_pWindow);
+                rgbWinClosed = true;
+            }
+        }
+
+		if (!glfwWindowShouldClose(depthWin->m_pWindow))
+        {
+            MakeContextCurrent(depthWin);
+        
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            std::copy(depth->data, depth->data + depth->width * depth->height * depth->bytes_per_pixel, depthShader.texture_buffer);
+
+            depthShader.textureFlipY(); 
+	    	depthShader.setTexture();
+            depthShader.render();
+            
+            //glBindVertexArray( g_mVAOs[depthWin->m_uiID] );
+            glfwSwapBuffers(depthWin->m_pWindow);
+            CheckForGLErrors("Render Error");
+            glfwPollEvents(); // process events!
+        }
+        else
+        {
+            if(!depthWinClosed)
+            {
+                delete depthWin->m_pGLEWContext;
+			    glfwDestroyWindow(depthWin->m_pWindow);
+                depthWinClosed = true;
+            }
+        }
+     
+        // IMPORTANT£¡
+        listener.release(frames);
 	}
+   
+    glDeleteBuffers(1, &g_VBO);
+    glDeleteBuffers(1, &g_IBO);
+
+    glDeleteVertexArrays(1, &g_mVAOs[depthWin->m_uiID]);
+    glDeleteVertexArrays(1, &g_mVAOs[rgbWin->m_uiID]);
+ 
+    dev->stop();
+    dev->close();
+
+    delete rgbWin;
+    delete depthWin;
+
+    return 0;
+}
+
+
+int main()
+{
+
+    /////////////////////// INIT ///////////////////////////////
+	// Setup Our GLFW error callback, we do this before glfwInit so we know what goes wrong with init if it fails:
+	glfwSetErrorCallback(GLFWErrorCallback);
+
+	// Init GLFW:
+	if (!glfwInit())
+		return -1;
+
+	// create our first window:
+	rgbWin = CreateWindow(960, 540, "rgb", nullptr, nullptr);
+	
+	if (rgbWin == nullptr)
+	{
+		glfwTerminate();
+		return -1;
+	}
+
+	// Print out GLFW, OpenGL version and GLEW Version:
+	int iOpenGLMajor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MAJOR);
+	int iOpenGLMinor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MINOR);
+	int iOpenGLRevision = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_REVISION);
+	
+    printf("Status: Using GLFW Version %s\n", glfwGetVersionString() );
+	printf("Status: Using OpenGL Version: %i.%i, Revision: %i\n", iOpenGLMajor, iOpenGLMinor, iOpenGLRevision);
+	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION) );
+
+	// create our second window:
+	depthWin = CreateWindow(512, 424, "depth", nullptr, nullptr);
+
+
+    /////////////////////////// rgbWin ////////////////////////////
+	MakeContextCurrent(rgbWin);
+    rgbShader.setShader(c_szVertexShader, c_szRgbPixelShader);
+    rgbShader.build();
+    rgbShader.use();
+    rgbShader.setUniform("diffuseTexture", 0);
+   
+    /////////////////////////// depthWin ////////////////////////////
+	MakeContextCurrent(depthWin);
+    depthShader.setShader(c_szVertexShader, c_szDepthPixelShader);
+    depthShader.build();
+    depthShader.use();
+    depthShader.setUniform("Data", 0);   
+    CheckForGLErrors("Texture Loading Error");
+
+    libfreenectInfo();
+
+	return MainLoop();
 }

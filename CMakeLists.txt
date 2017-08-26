@@ -267,10 +267,9 @@ IF(ENABLE_CUDA)
       "${NVCUDASAMPLES_ROOT}/common/inc"
     )
 
+    SET(CUDA_ARCH -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35)
 	SET(CUDA_FLAGS -use_fast_math)
-    SET(CUDA_FLAGS "${CUDA_FLAGS} -Xcompiler -fPIC")
-	#SET(GENCODE ${GENCODE}  -gencode=arch=compute_61,code=sm_61) 
-	#SET(GENCODE -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_61,code=sm_61) 
+    SET(CUDA_FLAGS "${CUDA_FLAGS} ${CUDA_ARCH} -Xcompiler -fPIC")
    
 	SET(OLD_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 	

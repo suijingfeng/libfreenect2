@@ -270,7 +270,7 @@ private:
     bool shouldStop;
     GLFWwindow* window;
 	////
-	GLFWwindow* pcwin; 
+	////GLFWwindow* pcwin; 
     ////
 	GLuint triangle_vbo, triangle_vao;
     ShaderProgram renderShader;

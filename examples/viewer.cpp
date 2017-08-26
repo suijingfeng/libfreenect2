@@ -68,7 +68,7 @@ void Viewer::initialize()
         std::cerr << "Failed to create opengl window." << std::endl;
         exit(-1);
     }
-
+/*
 	pcwin = glfwCreateWindow(win_width, win_height, "Cloud Viewer", 0, NULL);
 
 	if (pcwin == NULL)
@@ -76,7 +76,7 @@ void Viewer::initialize()
         std::cerr << "Failed to create cloud viewer window." << std::endl;
         exit(-1);
     }
-
+*/
     glfwMakeContextCurrent(window);
 	
     OpenGLBindings *b = new OpenGLBindings();
@@ -182,7 +182,7 @@ bool Viewer::render()
         float w = static_cast<float>(frame->width);
         float h = static_cast<float>(frame->height);
 		
-		// std::cout << "width: " << w <<", "<< "height: " << h << std::endl;
+		//std::cout << "width: " << w <<", "<< "height: " << h << std::endl;
         Vertex bl = { -1.0f, -1.0f, 0.0f, 0.0f };
         Vertex br = { 1.0f, -1.0f, w, 0.0f }; 
         Vertex tl = { -1.0f, 1.0f, 0.0f, h };

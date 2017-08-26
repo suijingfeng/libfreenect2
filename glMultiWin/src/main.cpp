@@ -11,7 +11,6 @@
 #include <libfreenect2/registration.h>
 #include <libfreenect2/packet_pipeline.h>
 
-
 // Note that the following includes must be defined in order:
 #define GLEW_STATIC
 #define GLEW_MX
@@ -26,17 +25,17 @@
  
 
 /// freenect2 /////////////////////
-  libfreenect2::Freenect2 freenect2;
-  libfreenect2::Freenect2Device *dev = 0;
-  libfreenect2::PacketPipeline *pipeline = 0;
+libfreenect2::Freenect2 freenect2;
+libfreenect2::Freenect2Device *dev = 0;
+libfreenect2::PacketPipeline *pipeline = 0;
 /// [context]
 
-  std::string serial = "";
-  bool enable_rgb = true;
-  bool enable_depth = true;
+std::string serial = "";
+bool enable_rgb = true;
+bool enable_depth = true;
 
-  //int deviceId = -1;
-  //size_t framemax = -1;
+//int deviceId = -1;
+//size_t framemax = -1;
 
 libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth);
 
@@ -109,21 +108,38 @@ struct ShaderProgram
 {
     GLuint program, vertex_shader, fragment_shader;
     GLuint texture;
-    unsigned char texture_buffer[1920*1080*4];
+    unsigned int bytes_per_pixel, height, width, size;
+    GLenum internalFormat, format, type;
     char error_buffer[256];
-    
-    ShaderProgram() :
-        program(0),
-        vertex_shader(0),
-        fragment_shader(0)
+    unsigned char* texture_buffer;
+
+    ShaderProgram(unsigned int w, unsigned int h, unsigned int bpp, GLenum iFm, GLenum fm, GLenum t)
     {
+        program = 0;
+        vertex_shader = 0;
+        fragment_shader = 0;
+
+        width = w;
+        height = h;
+        bytes_per_pixel = bpp;
+
+        size = width * height * bytes_per_pixel;
+        texture_buffer = new unsigned char[size];
+
+        internalFormat = iFm;
+        format = fm;
+        type =t;
+        
         glGenTextures(1, &texture);
     }
 
+
     ~ShaderProgram() 
     {
-       glDeleteTextures(1, &texture); 
+       glDeleteTextures(1, &texture);
+       delete[] texture_buffer;
     }
+
     void setShader(const char* vertexSrc, const char* fragmentSrc)
     {
         int vslen = strlen(vertexSrc);
@@ -177,7 +193,7 @@ struct ShaderProgram
     // load a texture:
     //printf("GL_RGBA: %d, GL_BGRA: %d, GL_UNSIGNED_BYTE: %d\n", GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
 
-    void setTexture(int width, int height, GLenum internalFormat, GLenum format, GLenum type)
+    void setTexture()
     {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
@@ -243,10 +259,10 @@ std::list<WindowHandle>	g_lWindows;
 WindowHandle			g_hCurrentContext = nullptr;
 
 Window*            rgbWin;
-ShaderProgram      rgbShader;
+ShaderProgram      rgbShader(1920, 1080, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
 
 Window*            depthWin;
-ShaderProgram      depthShader;
+ShaderProgram      depthShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
 
 Window*            irWin;
 Window*            cloudWin;
@@ -265,10 +281,8 @@ struct Vertex
 };
 
 
-
 int Init();
 int MainLoop();
-int ShutDown();
 
 void GLFWErrorCallback(int a_iError, const char* a_szDiscription);
 void GLFWWindowSizeCallback(GLFWwindow* a_pWindow, int a_iWidth, int a_iHeight);
@@ -356,11 +370,7 @@ int main()
 	if (iReturnCode != EC_NO_ERROR)
 		return iReturnCode;
 
-	iReturnCode = ShutDown();
-	if (iReturnCode != EC_NO_ERROR)
-		return iReturnCode;
-
-	return iReturnCode;
+    return iReturnCode;
 }
 
 
@@ -393,7 +403,7 @@ int Init()
 	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 
 	// create our second window:
-	depthWin = CreateWindow(512, 414, "depth", nullptr, nullptr);
+	depthWin = CreateWindow(512, 424, "depth", nullptr, nullptr);
 
 
     /////////////////////////// rgbWin ////////////////////////////
@@ -444,6 +454,9 @@ void flipY(size_t width, size_t height, size_t bytes_per_pixel, unsigned char * 
 
 int MainLoop()
 {
+
+    bool rgbWinClosed = false;
+    bool depthWinClosed = false;
     // now create a quad:
     Vertex aoVertices[4];
 
@@ -532,9 +545,8 @@ int MainLoop()
 
 
 
-	while (!ShouldClose())
+	while ( !rgbWinClosed || !depthWinClosed )
 	{
-
         libfreenect2::FrameMap frames;
         if (!listener.waitForNewFrame(frames, 5*1000)) // 10 sconds
         {
@@ -545,16 +557,19 @@ int MainLoop()
         libfreenect2::Frame *depth =  frames[libfreenect2::Frame::Depth];
         libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
 
-		// draw each window in sequence:
-        MakeContextCurrent(rgbWin);
-        {   
-			std::copy(rgb->data, rgb->data + rgb->width * rgb->height * rgb->bytes_per_pixel, rgbShader.texture_buffer);
+        // draw each window in sequence:
+
+		if (!glfwWindowShouldClose(rgbWin->m_pWindow))
+		{
+			MakeContextCurrent(rgbWin);
+            
+            std::copy(rgb->data, rgb->data + rgb->width * rgb->height * rgb->bytes_per_pixel, rgbShader.texture_buffer);
             flipY(rgb->width, rgb->height, rgb->bytes_per_pixel, rgbShader.texture_buffer);
 
-			// clear the backbuffer to our clear colour and clear the depth buffer
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            // clear the backbuffer to our clear colour and clear the depth buffer
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            rgbShader.setTexture(1920, 1080, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
+            rgbShader.setTexture();
             rgbShader.use();
             glBindVertexArray( g_mVAOs[rgbWin->m_uiID] );
     
@@ -563,34 +578,52 @@ int MainLoop()
                
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-			glfwSwapBuffers(rgbWin->m_pWindow);
-			CheckForGLErrors("Render Error");
+            glfwSwapBuffers(rgbWin->m_pWindow);
+            CheckForGLErrors("Render Error");
+            glfwPollEvents(); // process events!
+		}
+        else
+        {
+            if(!rgbWinClosed)
+            {
+                delete rgbWin->m_pGLEWContext;
+			    glfwDestroyWindow(rgbWin->m_pWindow);
+                rgbWinClosed = true;
+            }
         }
-		glfwPollEvents(); // process events!
 
-
-        MakeContextCurrent(depthWin);
-        { 
+		if (!glfwWindowShouldClose(depthWin->m_pWindow))
+        {
+            MakeContextCurrent(depthWin);
+        
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             std::copy(depth->data, depth->data + depth->width * depth->height * depth->bytes_per_pixel, depthShader.texture_buffer);
             flipY(depth->width, depth->height, depth->bytes_per_pixel, depthShader.texture_buffer);
 
 			//glActiveTexture( GL_TEXTURE0 );
-	    	depthShader.setTexture(512, 414, GL_R32F, GL_RED, GL_FLOAT);
+	    	depthShader.setTexture();
             depthShader.use();
             //libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
 
             glBindVertexArray( g_mVAOs[depthWin->m_uiID] );
             glPixelStorei( GL_UNPACK_ALIGNMENT, 1);
-            glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 512, 414, GL_RED, GL_FLOAT, depthShader.texture_buffer);
+            glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, 512, 424, GL_RED, GL_FLOAT, depthShader.texture_buffer);
       
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 			glfwSwapBuffers(depthWin->m_pWindow);
-			CheckForGLErrors("Render Error");
+            CheckForGLErrors("Render Error");
+            glfwPollEvents(); // process events!
         }
-      
-		glfwPollEvents(); // process events!
-         
+        else
+        {
+            if(!depthWinClosed)
+            {
+                delete depthWin->m_pGLEWContext;
+			    glfwDestroyWindow(depthWin->m_pWindow);
+                depthWinClosed = true;
+            }
+        }
+     
         // IMPORTANT£¡
         listener.release(frames);
 	}
@@ -604,24 +637,8 @@ int MainLoop()
     dev->stop();
     dev->close();
 
-	return EC_NO_ERROR;
-}
-
-
-int ShutDown()
-{
-	// cleanup any remaining windows:
-	for (auto& window :g_lWindows)
-	{
-		delete window->m_pGLEWContext;
-		glfwDestroyWindow(window->m_pWindow);
-
-		delete window;
-	}
-
-	// terminate GLFW:
-	glfwTerminate();
-
+    delete rgbWin;
+    delete depthWin;
 	return EC_NO_ERROR;
 }
 
@@ -754,39 +771,6 @@ void MakeContextCurrent(WindowHandle a_hWindowHandle)
 	}
 }
 
-bool ShouldClose()
-{
-	if (g_lWindows.empty())
-		return true;
-
-	std::list<WindowHandle> lToDelete;
-	for (const auto& window : g_lWindows)
-	{
-		if (glfwWindowShouldClose(window->m_pWindow))
-		{
-			lToDelete.push_back(window);
-		}
-	}
-
-	if (!lToDelete.empty())
-	{
-		// we have windows to delete, Delete them:
-		for (auto& window : lToDelete)
-		{
-			delete window->m_pGLEWContext;
-			glfwDestroyWindow(window->m_pWindow);
-
-			delete window;
-
-			g_lWindows.remove(window);
-		}
-	}
-
-	if (g_lWindows.empty())
-		return true;
-
-	return false;
-}
 
 void CheckForGLErrors(std::string a_szMessage)
 {

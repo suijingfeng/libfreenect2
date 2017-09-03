@@ -25,12 +25,21 @@
  
 
 ////////////////// freenect2 /////////////////////
+#define ENABLE_CLOUD    true
+#define ENABLE_RGB      true
+#define ENABLE_IR       true
+#define ENABLE_DEPTH    true
+
 libfreenect2::Freenect2 freenect2;
 libfreenect2::Freenect2Device *dev = 0;
 libfreenect2::PacketPipeline *pipeline = 0;
 std::string serial = "";
 libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth);
 
+#if ENABLE_CLOUD
+libfreenect2::Registration* registration;
+libfreenect2::Frame undistorted(512, 424, 4), cloud(512, 424, 4);
+#endif
 
 const char *c_szVertexShader =""
     "#version 410\n"
@@ -61,7 +70,7 @@ const char *c_szRgbPixelShader =""
 		"outColour = texture(diffuseTexture, vUV) ;"
 	"}";
 
-const char *c_szDepthPixelShader = ""
+const char *c_szDepthPixelShader =""
     "#version 410\n"
         
     "in vec2 vUV;"
@@ -77,12 +86,25 @@ const char *c_szDepthPixelShader = ""
     "}";
 
 
+struct Vertex
+{
+	glm::vec4 m_v4Position;
+	glm::vec2 m_v2UV;
+};
+
+
 struct ShaderProgram
 {
     GLuint program, vertex_shader, fragment_shader;
     GLuint texture;
+    GLuint VAO, VBO, IBO;
+
     unsigned int bytes_per_pixel, height, width, size;
     GLenum internalFormat, format, type;
+
+    Vertex aoVertices[4];
+    unsigned int auiIndex[6];
+
     char error_buffer[256];
     unsigned char* texture_buffer;
 
@@ -101,7 +123,23 @@ struct ShaderProgram
 
         internalFormat = iFm;
         format = fm;
-        type =t;
+        type = t;
+        
+        aoVertices[0].m_v4Position = glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f);
+        aoVertices[0].m_v2UV = glm::vec2(0.0f, 0.0f);
+        aoVertices[1].m_v4Position = glm::vec4(1.0f, -1.0f, 0.0f, 1.0f);
+        aoVertices[1].m_v2UV = glm::vec2(1.0f, 0.0f);
+        aoVertices[2].m_v4Position = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
+        aoVertices[2].m_v2UV = glm::vec2(1.0f, 1.0f);
+        aoVertices[3].m_v4Position = glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f);
+        aoVertices[3].m_v2UV = glm::vec2(0.0f, 1.0f);
+
+        auiIndex[0] = 0;
+        auiIndex[1] = 1;
+        auiIndex[2] = 3;
+        auiIndex[3] = 1;
+        auiIndex[4] = 2;
+        auiIndex[5] = 3;
         
         glGenTextures(1, &texture);
     }
@@ -109,11 +147,15 @@ struct ShaderProgram
 
     ~ShaderProgram() 
     {
-       glDeleteTextures(1, &texture);
-       delete[] texture_buffer;
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &IBO);
+        glDeleteTextures(1, &texture);
+        delete[] texture_buffer;
     }
 
-    void setShader(const char* vertexSrc, const char* fragmentSrc)
+
+    void setShaderSrc(const char* vertexSrc, const char* fragmentSrc)
     {
         int vslen = strlen(vertexSrc);
         vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -170,8 +212,31 @@ struct ShaderProgram
         glPixelStorei( GL_UNPACK_ALIGNMENT, 1);
         glTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, width, height, format, type, texture_buffer); 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
+        glBindVertexArray( VAO );
     }
+
+    void setupVaoVbo()
+    {
+        glGenBuffers(1, &VBO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
+
+        glGenBuffers(1, &IBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
+ 
+        glGenVertexArrays(1, &VAO);
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IBO);
+
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
+        glEnableVertexAttribArray(0);
+
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
+        glEnableVertexAttribArray(1);
+    }
+
 
     void setTexture()
     {
@@ -253,26 +318,17 @@ struct Window
 	unsigned int	m_uiID;
 };
 
-typedef Window*	WindowHandle;
+Window*	g_hCurrentContext = nullptr;
+Window* rgbWin;
+Window* depthWin;
+Window* irWin;
+
+#if ENABLE_CLOUD
+Window* cloudWin;
+#endif
+
+
 unsigned int Window::g_uiWindowCounter = 0;
-Window*		    g_hCurrentContext = nullptr;
-
-Window*         rgbWin;
-ShaderProgram   rgbShader(1920, 1080, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
-
-Window*         depthWin;
-ShaderProgram   depthShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
-
-//Window*            irWin;
-//Window*            cloudWin;
-//glm::mat4	 g_ModelMatrix;
-
-struct Vertex
-{
-	glm::vec4 m_v4Position;
-	glm::vec2 m_v2UV;
-};
-
 
 void GLFWErrorCallback(int a_iError, const char* a_szDiscription)
 {
@@ -293,12 +349,29 @@ void GLFWWindowSizeCallback(GLFWwindow* a_pWindow, int a_iWidth, int a_iHeight)
     else if(a_pWindow == depthWin->m_pWindow)
     {
         depthWin->m_uiWidth = a_iWidth;
-		depthWin->m_uiHeight = a_iHeight;
+        depthWin->m_uiHeight = a_iHeight;
         glfwMakeContextCurrent(depthWin->m_pWindow);
         glViewport(0, 0, a_iWidth, a_iHeight);
         g_hCurrentContext = depthWin;
     }
-    else{ }
+    else if(a_pWindow == irWin->m_pWindow)
+    {
+        irWin->m_uiWidth = a_iWidth;
+        irWin->m_uiHeight = a_iHeight;
+        glfwMakeContextCurrent(irWin->m_pWindow);
+        glViewport(0, 0, a_iWidth, a_iHeight);
+        g_hCurrentContext = irWin;
+    }
+    #if ENABLE_CLOUD
+        else if(a_pWindow == cloudWin->m_pWindow)
+        {
+            cloudWin->m_uiWidth = a_iWidth;
+            cloudWin->m_uiHeight = a_iHeight;
+            glfwMakeContextCurrent(irWin->m_pWindow);
+            glViewport(0, 0, a_iWidth, a_iHeight);
+            g_hCurrentContext = cloudWin;
+        }
+    #endif
 }
 
 
@@ -310,16 +383,16 @@ GLEWContext* glewGetContext()
 // This needs to be defined for GLEW MX to work, 
 // along with the GLEW_MX define in the perprocessor!
 // The MakeContextCurrent() function is a wrapper for the glfw3 
-// function glfwMakeContextCurrent(), it takes in our WindowHandle type and
+// function glfwMakeContextCurrent(), it takes in our Window* type and
 // makes sure to set g_hCurrentContext to the correct window when
 // it changes the context. This is how we track which context is active.
-//void MakeContextCurrent(WindowHandle a_hWindowHandle);
-void MakeContextCurrent(WindowHandle a_hWindowHandle)
+
+void MakeContextCurrent(Window* a_hWindowPointer)
 {
-	if (a_hWindowHandle != nullptr)
+	if (a_hWindowPointer != nullptr)
 	{
-		glfwMakeContextCurrent(a_hWindowHandle->m_pWindow);
-		g_hCurrentContext = a_hWindowHandle;
+		glfwMakeContextCurrent(a_hWindowPointer->m_pWindow);
+		g_hCurrentContext = a_hWindowPointer;
 	}
 }
 
@@ -335,13 +408,13 @@ void CheckForGLErrors(std::string a_szMessage)
 }
 
 
-WindowHandle CreateWindow(int a_iWidth, int a_iHeight, const std::string& a_szTitle, GLFWmonitor* a_pMonitor, WindowHandle a_hShare)
+Window* CreateWindow(int a_iWidth, int a_iHeight, const std::string& a_szTitle, GLFWmonitor* a_pMonitor, Window* a_hShare)
 {
 	// save current active context info so we can restore it later!
-	WindowHandle hPreviousContext = g_hCurrentContext;
+	Window* hPreviousContext = g_hCurrentContext;
 
 	// create new window data:
-	WindowHandle newWindow = new Window();
+	Window* newWindow = new Window();
 	if (newWindow == nullptr)
 		return nullptr;
 
@@ -357,14 +430,12 @@ WindowHandle CreateWindow(int a_iWidth, int a_iHeight, const std::string& a_szTi
     // Check that the Window Handle passed in is valid.
 	if (a_hShare != nullptr)
     {
-		newWindow->m_pWindow = glfwCreateWindow(a_iWidth, a_iHeight, 
-                a_szTitle.c_str(), a_pMonitor, a_hShare->m_pWindow);  
+		newWindow->m_pWindow = glfwCreateWindow(a_iWidth, a_iHeight, a_szTitle.c_str(), a_pMonitor, a_hShare->m_pWindow);  
         // Window handle is valid, Share its GL Context Data!
 	}
 	else
 	{
-		newWindow->m_pWindow = glfwCreateWindow(a_iWidth, a_iHeight, 
-                a_szTitle.c_str(), a_pMonitor, nullptr); 
+		newWindow->m_pWindow = glfwCreateWindow(a_iWidth, a_iHeight, a_szTitle.c_str(), a_pMonitor, nullptr); 
         // Window handle is invlad, do not share!
 	}
 	
@@ -416,8 +487,8 @@ int libfreenectInfo()
 {
     bool enable_rgb = true;
     bool enable_depth = true;
-    //std::string program_path(argv[0]);
-    printf( "Version: %s\n", LIBFREENECT2_VERSION );
+
+    printf("Version: %s\n", LIBFREENECT2_VERSION );
 
     /// [discovery]
     if(freenect2.enumerateDevices() == 0)
@@ -459,6 +530,10 @@ int libfreenectInfo()
     {
         if (!dev->start())
             return -1;
+
+        #if ENABLE_CLOUD
+            registration = new libfreenect2::Registration(dev->getIrCameraParams(), dev->getColorCameraParams());
+        #endif 
     }
     else
     {
@@ -470,88 +545,114 @@ int libfreenectInfo()
 }
 
 
-int MainLoop()
+int main(int argc, char *argv[])
 {
-    unsigned int g_VBO = 0;
-    unsigned int g_IBO = 0;
-    std::map<unsigned int, unsigned int> g_mVAOs;
     bool rgbWinClosed = false;
     bool depthWinClosed = false;
-    // now create a quad:
-    Vertex aoVertices[4];
+    bool irWinClosed = false;
 
-    aoVertices[0].m_v4Position = glm::vec4(-1.0f, -1.0f, 0.0f, 1.0f);
-    aoVertices[0].m_v2UV = glm::vec2(0.0f, 0.0f);
-
-    aoVertices[1].m_v4Position = glm::vec4(1.0f, -1.0f, 0.0f, 1.0f);
-    aoVertices[1].m_v2UV = glm::vec2(1.0f, 0.0f);
+    ShaderProgram rgbShader(1920, 1080, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
+    ShaderProgram depthShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
+    ShaderProgram irShader(512, 424, 4, GL_R32F, GL_RED, GL_FLOAT);
     
-    aoVertices[2].m_v4Position = glm::vec4(1.0f, 1.0f, 0.0f, 1.0f);
-    aoVertices[2].m_v2UV = glm::vec2(1.0f, 1.0f);
-    
-    aoVertices[3].m_v4Position = glm::vec4(-1.0f, 1.0f, 0.0f, 1.0f);
-    aoVertices[3].m_v2UV = glm::vec2(0.0f, 1.0f);
+    #if ENABLE_CLOUD
+        bool cloudWinClosed = false;
+        ShaderProgram cloudShader(512, 424, 4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE);
+    #endif 
 
-    unsigned int auiIndex[6] = { 0,1,3,   1,2,3 };
+    /////////////////////// INIT ///////////////////////////////
+	// Setup Our GLFW error callback, we do this before glfwInit so we know what goes wrong with init if it fails:
+	glfwSetErrorCallback(GLFWErrorCallback);
 
-    // Create VBO/IBO
-    glGenBuffers(1, &g_VBO);
-    glGenBuffers(1, &g_IBO);
+	// Init GLFW:
+	if (!glfwInit())
+		return -1;
 
-    /////////////////////////////////////////////////////////////////////////////////
-    MakeContextCurrent(rgbWin);
+	// create our first window:
+	rgbWin = CreateWindow(960, 540, "rgb", nullptr, nullptr);
+	if (rgbWin == nullptr)
+	{
+		glfwTerminate();
+		return -1;
+	}
 
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
+	// Print out GLFW, OpenGL version and GLEW Version:
+    printf("Status: Using GLFW Version %s\n", glfwGetVersionString() );
+	printf("Status: Using OpenGL Version: %i.%i, Revision: %i\n", 
+            glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MAJOR), 
+            glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MINOR),
+            glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_REVISION));
+	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION) );
 
-    // Setup VAO:
-    g_mVAOs[rgbWin->m_uiID] = 0;
-    glGenVertexArrays(1, &(g_mVAOs[rgbWin->m_uiID]));
-    glBindVertexArray(g_mVAOs[rgbWin->m_uiID]);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
+    // create our second window:
+	depthWin = CreateWindow(512, 424, "Depth", nullptr, nullptr);
+	if (depthWin == nullptr)
+	{
+		glfwTerminate();
+		return -1;
+	}
 
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
+    // create our third window:
+	irWin = CreateWindow(512, 424, "Ir", nullptr, nullptr);
+    if (irWin == nullptr)
+    {
+        glfwTerminate();
+		return -1;
+    }
 
-    CheckForGLErrors("Creating VAO Error");
-    
+    #if ENABLE_CLOUD
+	cloudWin = CreateWindow(512, 424, "Cloud", nullptr, nullptr);
+    if (cloudWin == nullptr)
+    {
+        glfwTerminate();
+		return -1;
+    }
+    #endif
+
+    /////////////////////////// rgbWin ////////////////////////////
+	MakeContextCurrent(rgbWin);
+    rgbShader.setShaderSrc(c_szVertexShader, c_szRgbPixelShader);
+    rgbShader.build();
+    rgbShader.use();
+    rgbShader.setUniform("diffuseTexture", 0);
+    rgbShader.setupVaoVbo();
+    CheckForGLErrors("Check creating VAO, VBO, texture loading Error");
+   
+    /////////////////////////// depthWin ////////////////////////////
+	MakeContextCurrent(depthWin);
+    depthShader.setShaderSrc(c_szVertexShader, c_szDepthPixelShader);
+    depthShader.build();
+    depthShader.use();
+    depthShader.setUniform("Data", 0);   
+    depthShader.setupVaoVbo();
+    CheckForGLErrors("Check creating VAO, VBO, texture loading Error");
+
+    /////////////////////////// irWin ////////////////////////////
+	MakeContextCurrent(irWin);
+    irShader.setShaderSrc(c_szVertexShader, c_szDepthPixelShader);
+    irShader.build();
+    irShader.use();
+    irShader.setUniform("Data", 0);   
+    irShader.setupVaoVbo();
+    CheckForGLErrors("Check creating VAO, VBO, texture loading Error");
+
+    #if ENABLE_CLOUD
+        MakeContextCurrent(cloudWin);
+        cloudShader.setShaderSrc(c_szVertexShader, c_szRgbPixelShader);
+        cloudShader.build();
+        cloudShader.use();
+        cloudShader.setUniform("diffuseTexture", 0);
+        cloudShader.setupVaoVbo();
+        CheckForGLErrors("Check creating VAO, VBO, texture loading Error");
+    #endif
+
     // set OpenGL Options:
-    //glViewport(0, 0, rgbWin->m_uiWidth, rgbWin->m_uiHeight);
-    //glClearColor(0.25f, 0.25f, 0.25f, 1);
-    //glEnable(GL_DEPTH_TEST);
-    //glEnable(GL_CULL_FACE);
-    //CheckForGLErrors("OpenGL Options Error");
+    // glClearColor(0.25f, 0.25f, 0.25f, 1);
+    // glEnable(GL_DEPTH_TEST); glEnable(GL_CULL_FACE);
 
-    ///////////////////////////////////////////////////////////////////////////////
-    MakeContextCurrent(depthWin);
-  
-    // Create VBO/IBO
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-    glBufferData(GL_ARRAY_BUFFER, 4 * sizeof(Vertex), aoVertices, GL_STATIC_DRAW);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(unsigned int), auiIndex, GL_STATIC_DRAW);
+    libfreenectInfo();    
 
-    // Setup VAO:
-    g_mVAOs[depthWin->m_uiID] = 1;
-
-    glGenVertexArrays(1, &(g_mVAOs[depthWin->m_uiID]));
-    glBindVertexArray(g_mVAOs[depthWin->m_uiID]);
-    glBindBuffer(GL_ARRAY_BUFFER, g_VBO);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_IBO);
-
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), ((char*)0) + 16);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    CheckForGLErrors("Creating VAO Error");
-    
-
-	while ( !rgbWinClosed || !depthWinClosed )
+	while ( !rgbWinClosed || !depthWinClosed || !irWinClosed || !cloudWinClosed )
 	{
         libfreenect2::FrameMap frames;
         if (!listener.waitForNewFrame(frames, 5*1000)) // 10 sconds
@@ -562,9 +663,9 @@ int MainLoop()
 
         libfreenect2::Frame *depth =  frames[libfreenect2::Frame::Depth];
         libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
-        //libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
-        // draw each window in sequence:
+        libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
 
+         // draw each window in sequence:
 		if (!glfwWindowShouldClose(rgbWin->m_pWindow))
 		{
 			MakeContextCurrent(rgbWin);
@@ -576,7 +677,6 @@ int MainLoop()
             rgbShader.setTexture();
             rgbShader.render();
 
-            //glBindVertexArray( g_mVAOs[rgbWin->m_uiID] );
             glfwSwapBuffers(rgbWin->m_pWindow);
             CheckForGLErrors("Render Error");
             
@@ -603,7 +703,6 @@ int MainLoop()
 	    	depthShader.setTexture();
             depthShader.render();
             
-            //glBindVertexArray( g_mVAOs[depthWin->m_uiID] );
             glfwSwapBuffers(depthWin->m_pWindow);
             CheckForGLErrors("Render Error");
             glfwPollEvents(); // process events!
@@ -618,75 +717,76 @@ int MainLoop()
             }
         }
      
+
+        if (!glfwWindowShouldClose(irWin->m_pWindow))
+        {
+            MakeContextCurrent(irWin);
+        
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            std::copy(ir->data, ir->data + ir->width * ir->height * ir->bytes_per_pixel, irShader.texture_buffer);
+
+            irShader.textureFlipY();
+	    	irShader.setTexture();
+            irShader.render();
+            
+            glfwSwapBuffers(irWin->m_pWindow);
+            CheckForGLErrors("Render Error");
+            glfwPollEvents(); // process events!
+        }
+        else
+        {
+            if(!irWinClosed)
+            {
+                delete irWin->m_pGLEWContext;
+			    glfwDestroyWindow(irWin->m_pWindow);
+                irWinClosed = true;
+            }
+        }
+
+        #if ENABLE_CLOUD
+
+            if (!glfwWindowShouldClose(cloudWin->m_pWindow))
+            {
+                MakeContextCurrent(cloudWin);
+                
+                registration->apply(rgb, depth, &undistorted, &cloud);
+
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                std::copy(cloud.data, cloud.data + cloud.width * cloud.height * cloud.bytes_per_pixel, cloudShader.texture_buffer);
+
+                cloudShader.textureFlipY();
+                cloudShader.setTexture();
+                cloudShader.render();
+                
+                glfwSwapBuffers(cloudWin->m_pWindow);
+                CheckForGLErrors("Cloud Render Error");
+                glfwPollEvents(); // process events!
+            }
+            else
+            {
+                if(!cloudWinClosed)
+                {
+                    delete cloudWin->m_pGLEWContext;
+                    glfwDestroyWindow(cloudWin->m_pWindow);
+                    cloudWinClosed = true;
+                }
+            }
+        #endif
+
         // IMPORTANT£¡
         listener.release(frames);
 	}
    
-    glDeleteBuffers(1, &g_VBO);
-    glDeleteBuffers(1, &g_IBO);
-
-    glDeleteVertexArrays(1, &g_mVAOs[depthWin->m_uiID]);
-    glDeleteVertexArrays(1, &g_mVAOs[rgbWin->m_uiID]);
- 
     dev->stop();
     dev->close();
 
     delete rgbWin;
     delete depthWin;
+    delete irWin;
 
+#if ENABLE_CLOUD
+    delete cloudWin;
+#endif
     return 0;
 }
 
-
-int main()
-{
-
-    /////////////////////// INIT ///////////////////////////////
-	// Setup Our GLFW error callback, we do this before glfwInit so we know what goes wrong with init if it fails:
-	glfwSetErrorCallback(GLFWErrorCallback);
-
-	// Init GLFW:
-	if (!glfwInit())
-		return -1;
-
-	// create our first window:
-	rgbWin = CreateWindow(960, 540, "rgb", nullptr, nullptr);
-	
-	if (rgbWin == nullptr)
-	{
-		glfwTerminate();
-		return -1;
-	}
-
-	// Print out GLFW, OpenGL version and GLEW Version:
-	int iOpenGLMajor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MAJOR);
-	int iOpenGLMinor = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_VERSION_MINOR);
-	int iOpenGLRevision = glfwGetWindowAttrib(rgbWin->m_pWindow, GLFW_CONTEXT_REVISION);
-	
-    printf("Status: Using GLFW Version %s\n", glfwGetVersionString() );
-	printf("Status: Using OpenGL Version: %i.%i, Revision: %i\n", iOpenGLMajor, iOpenGLMinor, iOpenGLRevision);
-	printf("Status: Using GLEW %s\n", glewGetString(GLEW_VERSION) );
-
-	// create our second window:
-	depthWin = CreateWindow(512, 424, "depth", nullptr, nullptr);
-
-
-    /////////////////////////// rgbWin ////////////////////////////
-	MakeContextCurrent(rgbWin);
-    rgbShader.setShader(c_szVertexShader, c_szRgbPixelShader);
-    rgbShader.build();
-    rgbShader.use();
-    rgbShader.setUniform("diffuseTexture", 0);
-   
-    /////////////////////////// depthWin ////////////////////////////
-	MakeContextCurrent(depthWin);
-    depthShader.setShader(c_szVertexShader, c_szDepthPixelShader);
-    depthShader.build();
-    depthShader.use();
-    depthShader.setUniform("Data", 0);   
-    CheckForGLErrors("Texture Loading Error");
-
-    libfreenectInfo();
-
-	return MainLoop();
-}

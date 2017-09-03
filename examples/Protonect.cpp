@@ -323,7 +323,7 @@ int main(int argc, char *argv[])
     }
     if(enable_rgb && enable_depth)
     {
-      //cloudviewer.addFrame("registered", &registered);
+      //viewer.addFrame("registered", &registered);
     }
 
     protonect_shutdown = protonect_shutdown || viewer.render();

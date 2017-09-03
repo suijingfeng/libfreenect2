@@ -6,7 +6,7 @@ Code for show kinect2's rgb image and depth image in seperate windows.
 [This tutorial](http://blog.gvnott.com/2013/05/18/tutorial-multiple-windows-with-glfw3-and-glew-mx/) shows how to get multiply windows going with GLFW3 and GLEW MX.
 I modify this tuterial to show rgb image and depth image with two seperate windows.
 
-![](https://github.com/suijingfeng/libfreenect2/blob/master/glMultiWin/doc/succeed.png)
+![](https://github.com/suijingfeng/libfreenect2/blob/master/glMultiWin/doc/fourwin.png)
 
 
 ## Extra: Multi-Threaded Demo

@@ -23,7 +23,6 @@
 // #define STB_IMAGE_IMPLEMENTATION
 // #include "stb_image.h"
  
-
 ////////////////// freenect2 /////////////////////
 #define ENABLE_CLOUD    true
 #define ENABLE_RGB      true
@@ -84,7 +83,6 @@ const char *c_szDepthPixelShader =""
         "tempColor = texture(Data, vUV);"
         "outColour = vec4(tempColor.x/4500, tempColor.x/4500, tempColor.x/4500, 1);"
     "}";
-
 
 struct Vertex
 {

@@ -1,4 +1,4 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12.1)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
 
 SET(PROJECT_VER_MAJOR 0)
 SET(PROJECT_VER_MINOR 2)
@@ -197,15 +197,14 @@ IF(ENABLE_OPENGL)
 
     LIST(APPEND LIBRARIES ${GLFW3_LIBRARIES} ${OPENGL_gl_LIBRARY})
     LIST(APPEND SOURCES src/flextGL.cpp src/opengl_depth_packet_processor.cpp)
-
     LIST(APPEND RESOURCES 
       src/shader/debug.fs
       src/shader/default.vs
       src/shader/filter1.fs
       src/shader/filter2.fs
       src/shader/stage1.fs
-      src/shader/stage2.fs
-    )
+      src/shader/stage2.fs)
+    
   ENDIF()
 ENDIF(ENABLE_OPENGL)
 
@@ -341,6 +340,7 @@ IF(BUILD_EXAMPLES)
   MESSAGE(STATUS "Configurating examples")
   ADD_SUBDIRECTORY(${MY_DIR}/examples)
   ADD_SUBDIRECTORY(${MY_DIR}/glMultiWin)
+  ADD_SUBDIRECTORY(${MY_DIR}/cvPclGrabber)
 ENDIF()
 
 SET(HAVE_OpenNI2 disabled)
@@ -358,11 +358,8 @@ IF(BUILD_OPENNI2_DRIVER)
       SET_TARGET_PROPERTIES(freenect2-openni2 PROPERTIES INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
     ENDIF()
     INSTALL(TARGETS freenect2-openni2 DESTINATION lib/OpenNI2/Drivers RUNTIME DESTINATION bin)
-    ADD_CUSTOM_TARGET(install-openni2
-      DEPENDS freenect2-openni2
-      COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_INSTALL_PREFIX}/lib/OpenNI2/Drivers/" "${OpenNI2_LIBRARY_DIR}/OpenNI2/Drivers/"
-      VERBATIM
-    )
+    ADD_CUSTOM_TARGET(install-openni2 DEPENDS freenect2-openni2 COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_INSTALL_PREFIX}/lib/OpenNI2/Drivers/" "${OpenNI2_LIBRARY_DIR}/OpenNI2/Drivers/" VERBATIM)
   ENDIF()
 ENDIF()
 

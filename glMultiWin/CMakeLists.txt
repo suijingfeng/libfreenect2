@@ -15,14 +15,11 @@ LIST(APPEND CMAKE_MODULE_PATH ${MY_DIR}/cmake_modules) # FindGLFW3.cmake
 IF(TARGET freenect2)
   MESSAGE(STATUS "Using in-tree freenect2 target")
   SET(freenect2_LIBRARIES freenect2)
-  SET(freenect2_DLLS ${LIBFREENECT2_DLLS})
 ELSE()
   FIND_PACKAGE(freenect2 REQUIRED)
-  # Out-of-tree build will have to have DLLs manually copied.
 ENDIF()
 
 INCLUDE_DIRECTORIES(${freenect2_INCLUDE_DIR})
-
 
 FIND_PACKAGE(GLFW3 REQUIRED)
 FIND_PACKAGE(OpenGL REQUIRED)

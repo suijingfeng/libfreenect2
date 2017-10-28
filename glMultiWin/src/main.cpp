@@ -32,7 +32,6 @@
 libfreenect2::Freenect2 freenect2;
 libfreenect2::Freenect2Device *dev = 0;
 libfreenect2::PacketPipeline *pipeline = 0;
-std::string serial = "";
 libfreenect2::SyncMultiFrameListener listener(libfreenect2::Frame::Color | libfreenect2::Frame::Ir | libfreenect2::Frame::Depth);
 
 #if ENABLE_CLOUD
@@ -41,7 +40,7 @@ libfreenect2::Frame undistorted(512, 424, 4), cloud(512, 424, 4);
 #endif
 
 const char *c_szVertexShader =""
-    "#version 410\n"
+    "#version 330\n"
 
 	"layout(location=0) in vec4 Position;"
 	"layout(location=1) in vec2 UV;"
@@ -58,7 +57,7 @@ const char *c_szVertexShader =""
 	"}";
 
 const char *c_szRgbPixelShader =""
-    "#version 410\n"
+    "#version 330\n"
 
 	"in vec2 vUV;"
 	"layout(location = 0) out vec4 outColour;"
@@ -70,7 +69,7 @@ const char *c_szRgbPixelShader =""
 	"}";
 
 const char *c_szDepthPixelShader =""
-    "#version 410\n"
+    "#version 330\n"
         
     "in vec2 vUV;"
     "layout(location = 0) out vec4 outColour;"
@@ -236,9 +235,9 @@ struct ShaderProgram
     }
 
 
-    void setTexture()
+    void setTexture(unsigned int i)
     {
-        glActiveTexture(GL_TEXTURE0);
+        glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, texture);
 
         // specify default filtering and wrapping
@@ -324,7 +323,6 @@ Window* irWin;
 #if ENABLE_CLOUD
 Window* cloudWin;
 #endif
-
 
 unsigned int Window::g_uiWindowCounter = 0;
 
@@ -494,12 +492,8 @@ int libfreenectInfo()
         printf("no device connected!\n");
         return -1;
     }
-
-    if (serial == "")
-    {
-        serial = freenect2.getDefaultDeviceSerialNumber();
-        printf("device serial: %s\n", serial.c_str());
-    }
+    
+    std::string serial = freenect2.getDefaultDeviceSerialNumber();
 
     if(!pipeline)
     {
@@ -672,7 +666,7 @@ int main(int argc, char *argv[])
 
             std::copy(rgb->data, rgb->data + rgb->width * rgb->height * rgb->bytes_per_pixel, rgbShader.texture_buffer);
             rgbShader.textureFlipY();
-            rgbShader.setTexture();
+            rgbShader.setTexture(0);
             rgbShader.render();
 
             glfwSwapBuffers(rgbWin->m_pWindow);
@@ -698,7 +692,7 @@ int main(int argc, char *argv[])
             std::copy(depth->data, depth->data + depth->width * depth->height * depth->bytes_per_pixel, depthShader.texture_buffer);
 
             depthShader.textureFlipY(); 
-	    	depthShader.setTexture();
+	    	depthShader.setTexture(0);
             depthShader.render();
             
             glfwSwapBuffers(depthWin->m_pWindow);
@@ -724,7 +718,7 @@ int main(int argc, char *argv[])
             std::copy(ir->data, ir->data + ir->width * ir->height * ir->bytes_per_pixel, irShader.texture_buffer);
 
             irShader.textureFlipY();
-	    	irShader.setTexture();
+	    	irShader.setTexture(0);
             irShader.render();
             
             glfwSwapBuffers(irWin->m_pWindow);
@@ -741,35 +735,34 @@ int main(int argc, char *argv[])
             }
         }
 
-        #if ENABLE_CLOUD
+#if ENABLE_CLOUD
+        if (!glfwWindowShouldClose(cloudWin->m_pWindow))
+        {
+            MakeContextCurrent(cloudWin);
+            
+            registration->apply(rgb, depth, &undistorted, &cloud);
 
-            if (!glfwWindowShouldClose(cloudWin->m_pWindow))
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            std::copy(cloud.data, cloud.data + cloud.width * cloud.height * cloud.bytes_per_pixel, cloudShader.texture_buffer);
+
+            cloudShader.textureFlipY();
+            cloudShader.setTexture(0);
+            cloudShader.render();
+            
+            glfwSwapBuffers(cloudWin->m_pWindow);
+            CheckForGLErrors("Cloud Render Error");
+            glfwPollEvents(); // process events!
+        }
+        else
+        {
+            if(!cloudWinClosed)
             {
-                MakeContextCurrent(cloudWin);
-                
-                registration->apply(rgb, depth, &undistorted, &cloud);
-
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                std::copy(cloud.data, cloud.data + cloud.width * cloud.height * cloud.bytes_per_pixel, cloudShader.texture_buffer);
-
-                cloudShader.textureFlipY();
-                cloudShader.setTexture();
-                cloudShader.render();
-                
-                glfwSwapBuffers(cloudWin->m_pWindow);
-                CheckForGLErrors("Cloud Render Error");
-                glfwPollEvents(); // process events!
+                delete cloudWin->m_pGLEWContext;
+                glfwDestroyWindow(cloudWin->m_pWindow);
+                cloudWinClosed = true;
             }
-            else
-            {
-                if(!cloudWinClosed)
-                {
-                    delete cloudWin->m_pGLEWContext;
-                    glfwDestroyWindow(cloudWin->m_pWindow);
-                    cloudWinClosed = true;
-                }
-            }
-        #endif
+        }
+#endif
 
         // IMPORTANT£¡
         listener.release(frames);

@@ -16,8 +16,7 @@ The idea was to have each window run on a seperate thread.
 I just ported his code to ubuntu16.04 linux, provide a CMakeLists file. 
 
 ## dependency
-* GLFW3, for ubuntu16.04, sudo apt-get intall libglfw-dev
-* GLEW MX, for ubuntu16.04, sudo apt-get install libglewmx-dev
+* GLFW3, GLEW MX, GLM. for ubuntu16.04, sudo apt-get intall libglfw-dev libglfw3 libglewmx-dev libglm
 * OpenCV 3.2.0 and PCL (if build cvPclGrabber)
 
 ## build

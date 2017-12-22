@@ -56,7 +56,10 @@ typedef ImageFormat<12, GL_RGB32F, GL_RGB, GL_FLOAT> F32C3;
 typedef ImageFormat<4, GL_RGBA, GL_BGRA, GL_UNSIGNED_BYTE> F8C4;
 typedef ImageFormat<16, GL_RGBA32F, GL_RGBA, GL_FLOAT> F32C4;
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 template<typename FormatT>
 struct Texture : public WithOpenGLBindings
 {
@@ -68,8 +71,20 @@ public:
     unsigned char *data;
     size_t size;
 
+<<<<<<< HEAD
     Texture() : bytes_per_pixel(FormatT::BytesPerPixel), height(0), width(0),
 				texture(0), data(0), size(0) {  }
+=======
+    Texture() : bytes_per_pixel(FormatT::BytesPerPixel), height(0), width(0), texture(0), data(0), size(0)
+    {
+    }
+
+    void bindToUnit(GLenum unit)
+    {
+        gl()->glActiveTexture(unit);
+        glBindTexture(GL_TEXTURE_RECTANGLE, texture);
+    }
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 
     void allocate(size_t new_width, size_t new_height)
     {
@@ -79,20 +94,28 @@ public:
         data = new unsigned char[size];
 
         glGenTextures(1, &texture);
+<<<<<<< HEAD
 
         gl()->glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_RECTANGLE, texture);
 
+=======
+        bindToUnit(GL_TEXTURE0);
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
         glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_RECTANGLE, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+<<<<<<< HEAD
         glTexImage2D(GL_TEXTURE_RECTANGLE, 0, FormatT::InternalFormat, width, height,
 										   0, FormatT::Format, FormatT::Type, 0);
 
         //std::cout << "InternalFormat: " << FormatT::InternalFormat <<", " 
         //          << "FormatT::Format " << FormatT::Format <<", " 
         //          << "Type: " << FormatT::Type << std::endl;
+=======
+        glTexImage2D(GL_TEXTURE_RECTANGLE, 0, FormatT::InternalFormat, width, height, 0, FormatT::Format, FormatT::Type, 0);
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     }
 
     void deallocate()
@@ -103,6 +126,7 @@ public:
 
     void upload()
     {
+<<<<<<< HEAD
         //gl()->glActiveTexture(GL_TEXTURE0);
         //glBindTexture(GL_TEXTURE_RECTANGLE, texture);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -134,18 +158,65 @@ public:
     void download()
     {
         glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, data);
+=======
+        bindToUnit(GL_TEXTURE0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexSubImage2D(GL_TEXTURE_RECTANGLE, /*level*/0, /*xoffset*/0, /*yoffset*/0, width, height, FormatT::Format, FormatT::Type, data);
+    }
+
+    void download()
+    {
+        downloadToBuffer(data);
+    }
+
+    void downloadToBuffer(unsigned char *data)
+    {
+        glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, data);
+    }
+
+    void flipY()
+    {
+        flipYBuffer(data);
+    }
+
+    void flipYBuffer(unsigned char *data)
+    {
+        typedef unsigned char type;
+
+        size_t linestep = width * bytes_per_pixel / sizeof(type);
+
+        type *first_line = reinterpret_cast<type *>(data), *last_line = reinterpret_cast<type *>(data) + (height - 1) * linestep;
+
+        for (size_t y = 0; y < height / 2; ++y)
+        {
+            for (size_t x = 0; x < linestep; ++x, ++first_line, ++last_line)
+            {
+                std::swap(*first_line, *last_line);
+            }
+            last_line -= 2 * linestep;
+        }
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     }
 
     libfreenect2::Frame *downloadToNewFrame()
     {
         libfreenect2::Frame *f = new libfreenect2::Frame(width, height, bytes_per_pixel);
+<<<<<<< HEAD
         glReadPixels(0, 0, width, height, FormatT::Format, FormatT::Type, f->data);
         // flipY();
+=======
+        downloadToBuffer(f->data);
+        flipYBuffer(f->data);
+
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
         return f;
     }
 };
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 struct ShaderProgram : public WithOpenGLBindings
 {
     GLuint program, vertex_shader, fragment_shader;
@@ -184,11 +255,17 @@ struct ShaderProgram : public WithOpenGLBindings
 
         if (status != GL_TRUE)
         {
+<<<<<<< HEAD
             gl()->glGetShaderInfoLog(vertex_shader, sizeof(error_buffer),
 				   	NULL, error_buffer);
 
             std::cerr << "failed to compile vertex shader!" << std::endl
 					  << error_buffer << std::endl;
+=======
+            gl()->glGetShaderInfoLog(vertex_shader, sizeof(error_buffer), NULL, error_buffer);
+
+            std::cerr << "failed to compile vertex shader!" << std::endl << error_buffer << std::endl;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
         }
 
         gl()->glCompileShader(fragment_shader);
@@ -196,11 +273,17 @@ struct ShaderProgram : public WithOpenGLBindings
         gl()->glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &status);
         if (status != GL_TRUE)
         {
+<<<<<<< HEAD
             gl()->glGetShaderInfoLog(fragment_shader, sizeof(error_buffer),
 				   	NULL, error_buffer);
 
             std::cerr << "failed to compile fragment shader!" << std::endl
 			   	<< error_buffer << std::endl;
+=======
+            gl()->glGetShaderInfoLog(fragment_shader, sizeof(error_buffer), NULL, error_buffer);
+
+            std::cerr << "failed to compile fragment shader!" << std::endl << error_buffer << std::endl;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
         }
 
         program = gl()->glCreateProgram();
@@ -213,10 +296,15 @@ struct ShaderProgram : public WithOpenGLBindings
 
         if (status != GL_TRUE)
         {
+<<<<<<< HEAD
             gl()->glGetProgramInfoLog(program, sizeof(error_buffer),
 				     	NULL, error_buffer);
             std::cerr << "failed to link shader program!" << std::endl 
 					  << error_buffer << std::endl;
+=======
+            gl()->glGetProgramInfoLog(program, sizeof(error_buffer), NULL, error_buffer);
+            std::cerr << "failed to link shader program!" << std::endl << error_buffer << std::endl;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
         }
     }
 
@@ -263,6 +351,7 @@ struct ShaderProgram : public WithOpenGLBindings
     }
 };
 
+<<<<<<< HEAD
 
 class Viewer : WithOpenGLBindings
 {
@@ -277,6 +366,17 @@ private:
     ShaderProgram renderGrayShader;
 	std::string shader_folder;
     std::map<std::string, libfreenect2::Frame*> frames;
+=======
+class Viewer : WithOpenGLBindings {
+private:
+    bool shouldStop;
+    GLFWwindow* window;
+    GLuint triangle_vbo, triangle_vao;
+    ShaderProgram renderShader;
+    ShaderProgram renderGrayShader;
+	std::string shader_folder;
+    std::map<std::string,libfreenect2::Frame*> frames;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     Texture<F8C4> rgb;
     Texture<F32C1> ir;
     int win_width;
@@ -286,7 +386,11 @@ public:
     void initialize();
     virtual void onOpenGLBindingsChanged(OpenGLBindings *b);
     bool render();
+<<<<<<< HEAD
     void addFrame(std::string id, libfreenect2::Frame* frame);
+=======
+    void addFrame(std::string id,libfreenect2::Frame* frame);
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
     void winsize_callback(GLFWwindow* window, int w, int h);
     static void key_callbackstatic(GLFWwindow* window, int key, int scancode, int action, int mods);

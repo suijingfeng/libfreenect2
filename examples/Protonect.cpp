@@ -1,3 +1,32 @@
+<<<<<<< HEAD
+=======
+/*
+ * This file is part of the OpenKinect Project. http://www.openkinect.org
+ *
+ * Copyright (c) 2011 individual OpenKinect contributors. See the CONTRIB file
+ * for details.
+ *
+ * This code is licensed to you under the terms of the Apache License, version
+ * 2.0, or, at your option, the terms of the GNU General Public License,
+ * version 2.0. See the APACHE20 and GPL2 files for the text of the licenses,
+ * or the following URLs:
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.gnu.org/licenses/gpl-2.0.txt
+ *
+ * If you redistribute this file in source form, modified or unmodified, you
+ * may:
+ *   1) Leave this header intact and distribute it under the same terms,
+ *      accompanying it with the APACHE20 and GPL20 files, or
+ *   2) Delete the Apache 2.0 clause and accompany it with the GPL2 file, or
+ *   3) Delete the GPL v2 clause and accompany it with the APACHE20 file
+ * In all cases you must keep the copyright notice intact and include a copy
+ * of the CONTRIB file.
+ *
+ * Binary distributions must follow the binary distribution requirements of
+ * either License.
+ */
+
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 /** @file Protonect.cpp Main application file. */
 
 #include <iostream>
@@ -10,25 +39,61 @@
 #include <libfreenect2/registration.h>
 #include <libfreenect2/packet_pipeline.h>
 #include <libfreenect2/logger.h>
+<<<<<<< HEAD
 
 /// [logger]
 #include <fstream>
 
+=======
+/// [headers]
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 #ifdef EXAMPLES_WITH_OPENGL_SUPPORT
 #include "viewer.h"
 #endif
 
 
+<<<<<<< HEAD
 bool protonect_shutdown = false; // Whether the running application should shut down.
+=======
+bool protonect_shutdown = false; ///< Whether the running application should shut down.
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 
 void sigint_handler(int s)
 {
   protonect_shutdown = true;
 }
 
+<<<<<<< HEAD
 
 //The following demostrates how to create a custom logger
 /// [logger]
+=======
+bool protonect_paused = false;
+libfreenect2::Freenect2Device *devtopause;
+
+//Doing non-trivial things in signal handler is bad. If you want to pause,
+//do it in another thread.
+//Though libusb operations are generally thread safe, I cannot guarantee
+//everything above is thread safe when calling start()/stop() while
+//waitForNewFrame().
+void sigusr1_handler(int s)
+{
+  if (devtopause == 0)
+    return;
+/// [pause]
+  if (protonect_paused)
+    devtopause->start();
+  else
+    devtopause->stop();
+  protonect_paused = !protonect_paused;
+/// [pause]
+}
+
+//The following demostrates how to create a custom logger
+/// [logger]
+#include <fstream>
+#include <cstdlib>
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 class MyFileLogger: public libfreenect2::Logger
 {
 private:
@@ -38,8 +103,12 @@ public:
   {
     if (filename)
       logfile_.open(filename);
+<<<<<<< HEAD
 	
 	level_ = Debug;
+=======
+    level_ = Debug;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   }
   bool good()
   {
@@ -47,8 +116,12 @@ public:
   }
   virtual void log(Level level, const std::string &message)
   {
+<<<<<<< HEAD
     logfile_ << "[" << libfreenect2::Logger::level2str(level) << "] " 
 		     << message << std::endl;
+=======
+    logfile_ << "[" << libfreenect2::Logger::level2str(level) << "] " << message << std::endl;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   }
 };
 /// [logger]
@@ -65,6 +138,10 @@ public:
  * - -noviewer Disable viewer window.
  */
 int main(int argc, char *argv[])
+<<<<<<< HEAD
+=======
+/// [main]
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 {
   std::string program_path(argv[0]);
   std::cerr << "Version: " << LIBFREENECT2_VERSION << std::endl;
@@ -82,11 +159,23 @@ int main(int argc, char *argv[])
     binpath = program_path.substr(0, executable_name_idx);
   }
 
+<<<<<<< HEAD
 // create a console logger with debug level (default is console logger with info level)
 /// [logging]
   libfreenect2::setGlobalLogger(libfreenect2::createConsoleLogger(libfreenect2::Logger::Debug));
 /// [logging]
 
+=======
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
+  // avoid flooing the very slow Windows console with debug messages
+  libfreenect2::setGlobalLogger(libfreenect2::createConsoleLogger(libfreenect2::Logger::Info));
+#else
+  // create a console logger with debug level (default is console logger with info level)
+/// [logging]
+  libfreenect2::setGlobalLogger(libfreenect2::createConsoleLogger(libfreenect2::Logger::Debug));
+/// [logging]
+#endif
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 /// [file logging]
   MyFileLogger *filelogger = new MyFileLogger(getenv("LOGFILE"));
   if (filelogger->good())
@@ -103,6 +192,10 @@ int main(int argc, char *argv[])
 
   std::string serial = "";
 
+<<<<<<< HEAD
+=======
+  bool viewer_enabled = true;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   bool enable_rgb = true;
   bool enable_depth = true;
   int deviceId = -1;
@@ -182,6 +275,13 @@ int main(int argc, char *argv[])
     {
       serial = arg;
     }
+<<<<<<< HEAD
+=======
+    else if(arg == "-noviewer" || arg == "--noviewer")
+    {
+      viewer_enabled = false;
+    }
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     else if(arg == "-norgb" || arg == "--norgb")
     {
       enable_rgb = false;
@@ -205,7 +305,10 @@ int main(int argc, char *argv[])
     }
   }
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   if (!enable_rgb && !enable_depth)
   {
     std::cerr << "Disabling both streams is not allowed!" << std::endl;
@@ -242,17 +345,32 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+<<<<<<< HEAD
   signal(SIGINT, sigint_handler);
 
+=======
+  devtopause = dev;
+
+  signal(SIGINT,sigint_handler);
+#ifdef SIGUSR1
+  signal(SIGUSR1, sigusr1_handler);
+#endif
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   protonect_shutdown = false;
 
 /// [listeners]
   int types = 0;
   if (enable_rgb)
+<<<<<<< HEAD
 	types |= libfreenect2::Frame::Color;
   if (enable_depth)
     types |= libfreenect2::Frame::Ir | libfreenect2::Frame::Depth;
   
+=======
+    types |= libfreenect2::Frame::Color;
+  if (enable_depth)
+    types |= libfreenect2::Frame::Ir | libfreenect2::Frame::Depth;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
   libfreenect2::SyncMultiFrameListener listener(types);
   libfreenect2::FrameMap frames;
 
@@ -284,7 +402,14 @@ int main(int argc, char *argv[])
   size_t framecount = 0;
 #ifdef EXAMPLES_WITH_OPENGL_SUPPORT
   Viewer viewer;
+<<<<<<< HEAD
   viewer.initialize();
+=======
+  if (viewer_enabled)
+    viewer.initialize();
+#else
+  viewer_enabled = false;
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
 #endif
 
 /// [loop start]
@@ -296,7 +421,11 @@ int main(int argc, char *argv[])
       return -1;
     }
     libfreenect2::Frame *rgb = frames[libfreenect2::Frame::Color];
+<<<<<<< HEAD
 //    libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
+=======
+    libfreenect2::Frame *ir = frames[libfreenect2::Frame::Ir];
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     libfreenect2::Frame *depth = frames[libfreenect2::Frame::Depth];
 /// [loop start]
 
@@ -307,6 +436,7 @@ int main(int argc, char *argv[])
 /// [registration]
     }
 
+<<<<<<< HEAD
     if (++framecount % 100 == 0)
         std::cout << "The viewer is received " << framecount 
 			      << " frames. Ctrl-C to stop." << std::endl;
@@ -324,6 +454,30 @@ int main(int argc, char *argv[])
     if(enable_rgb && enable_depth)
     {
       //viewer.addFrame("registered", &registered);
+=======
+    framecount++;
+    if (!viewer_enabled)
+    {
+      if (framecount % 100 == 0)
+        std::cout << "The viewer is turned off. Received " << framecount << " frames. Ctrl-C to stop." << std::endl;
+      listener.release(frames);
+      continue;
+    }
+
+#ifdef EXAMPLES_WITH_OPENGL_SUPPORT
+    if (enable_rgb)
+    {
+      viewer.addFrame("RGB", rgb);
+    }
+    if (enable_depth)
+    {
+      viewer.addFrame("ir", ir);
+      viewer.addFrame("depth", depth);
+    }
+    if (enable_rgb && enable_depth)
+    {
+      viewer.addFrame("registered", &registered);
+>>>>>>> d322e53a4bec867ef7e36b74f85828c8fc38b150
     }
 
     protonect_shutdown = protonect_shutdown || viewer.render();

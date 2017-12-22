@@ -1,11 +1,10 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.0)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12.1)
 
 SET(PROJECT_VER_MAJOR 0)
 SET(PROJECT_VER_MINOR 2)
 SET(PROJECT_VER_PATCH 0)
 SET(PROJECT_VER "${PROJECT_VER_MAJOR}.${PROJECT_VER_MINOR}.${PROJECT_VER_PATCH}")
 SET(PROJECT_APIVER "${PROJECT_VER_MAJOR}.${PROJECT_VER_MINOR}")
-
 
 IF(NOT DEFINED CMAKE_BUILD_TYPE)
   # No effect for multi-configuration generators (e.g. for Visual Studio)
@@ -183,7 +182,6 @@ IF(TurboJPEG_FOUND)
   LIST(APPEND LIBRARIES ${TurboJPEG_LIBRARIES} )
 ENDIF()
 
-
 SET(HAVE_OpenGL disabled)
 IF(ENABLE_OPENGL)
   FIND_PACKAGE(GLFW3)
@@ -204,11 +202,9 @@ IF(ENABLE_OPENGL)
       src/shader/filter2.fs
       src/shader/stage1.fs
       src/shader/stage2.fs)
-    
   ENDIF()
 ENDIF(ENABLE_OPENGL)
 
-	
 SET(HAVE_OpenCL disabled)
 IF(ENABLE_OPENCL)
   FIND_PACKAGE(OpenCL)
@@ -234,7 +230,6 @@ IF(ENABLE_OPENCL)
     )
 
     LIST(APPEND LIBRARIES ${OpenCL_LIBRARIES})
-
     LIST(APPEND RESOURCES
       src/opencl_depth_packet_processor.cl
       src/opencl_kde_depth_packet_processor.cl
@@ -249,7 +244,6 @@ IF(ENABLE_OPENCL)
   ENDIF(OpenCL_FOUND)
 ENDIF(ENABLE_OPENCL)
 
-	
 SET(HAVE_CUDA disabled)
 IF(ENABLE_CUDA)
   FIND_PACKAGE(CUDA)
@@ -260,7 +254,7 @@ IF(ENABLE_CUDA)
     SET(HAVE_CUDA yes)
 
     STRING(REPLACE "\\" "/" NVCUDASAMPLES_ROOT "$ENV{NVCUDASAMPLES_ROOT};$ENV{NVCUDASAMPLES8_0_ROOT}")
-    CUDA_INCLUDE_DIRECTORIES(
+   CUDA_INCLUDE_DIRECTORIES(
       "${MY_DIR}/include/"
       "${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc"
       "${NVCUDASAMPLES_ROOT}/common/inc"
@@ -283,6 +277,16 @@ IF(ENABLE_CUDA)
     LIST(APPEND LIBRARIES ${CUDA_LIBRARIES})
   ENDIF()
 ENDIF(ENABLE_CUDA)
+
+# RPATH handling for CUDA 8.0 libOpenCL.so conflict. See #804.
+IF(HAVE_OpenCL STREQUAL yes AND UNIX AND NOT APPLE)
+  FILE(GLOB CUDA_ld_so_conf /etc/ld.so.conf.d/cuda*.conf)
+  IF(CUDA_ld_so_conf)
+    MESSAGE(WARNING "Your CUDA installation overrides OpenCL system library path.")
+    GET_FILENAME_COMPONENT(OpenCL_LIB_PATH ${OpenCL_LIBRARY} DIRECTORY)
+    SET(CMAKE_INSTALL_RPATH ${OpenCL_LIB_PATH} CACHE STRING "Set RPATH for system OpenCL")
+  ENDIF()
+ENDIF()
 
 # RPATH handling for private libusb copies
 # Users have two options:
@@ -324,12 +328,14 @@ MESSAGE(STATUS "Linking with these libraries: \n ${LIBRARIES_STRING}")
 TARGET_LINK_LIBRARIES(freenect2 ${LIBRARIES})
 
 CONFIGURE_FILE(freenect2.cmake.in "${PROJECT_BINARY_DIR}/freenect2Config.cmake" @ONLY)
+CONFIGURE_FILE(freenect2Version.cmake.in "${PROJECT_BINARY_DIR}/freenect2ConfigVersion.cmake" @ONLY)
 CONFIGURE_FILE(freenect2.pc.in "${PROJECT_BINARY_DIR}/freenect2.pc" @ONLY)
 
 INSTALL(TARGETS freenect2 DESTINATION lib RUNTIME DESTINATION bin)
 INSTALL(DIRECTORY "${MY_DIR}/include/${PROJECT_NAME}" DESTINATION include PATTERN "*.in" EXCLUDE)
 INSTALL(DIRECTORY "${PROJECT_BINARY_DIR}/${PROJECT_NAME}" DESTINATION include)
 INSTALL(FILES "${PROJECT_BINARY_DIR}/freenect2Config.cmake" DESTINATION lib/cmake/freenect2/)
+INSTALL(FILES "${PROJECT_BINARY_DIR}/freenect2ConfigVersion.cmake" DESTINATION lib/cmake/freenect2/)
 INSTALL(FILES "${PROJECT_BINARY_DIR}/freenect2.pc" DESTINATION lib/pkgconfig/)
 
 ADD_SUBDIRECTORY(${MY_DIR}/doc)

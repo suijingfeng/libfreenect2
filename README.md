@@ -247,4 +247,3 @@ Note: Ubuntu 12.04 is too old to support. Debian jessie may also be too old, and
 * Set up udev rules for device access: `sudo cp ../platform/linux/udev/90-kinect2.rules /etc/udev/rules.d/`, then replug the Kinect.
 * Run the test program: `./bin/Protonect`
 * Run OpenNI2 test (optional): `sudo apt-get install openni2-utils && sudo make install-openni2 && NiViewer2`. Environment variable `LIBFREENECT2_PIPELINE` can be set to `cl`, `cuda`, etc to specify the pipeline.
-
